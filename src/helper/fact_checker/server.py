@@ -21,9 +21,9 @@ from fact_checker import analyses, feedback
 from fact_checker.adapters.diarization import Diarizer
 from fact_checker.adapters.factcheck_google import GoogleFactCheck
 from fact_checker.adapters.llm_anthropic_api import AnthropicAPI
-from fact_checker.adapters.llm_chat_api import ChatAPI
+from fact_checker.adapters.llm_chat_api import ChatAPI, needs_key
 from fact_checker.adapters.llm_claude_cli import ClaudeCLI
-from fact_checker.adapters.llm_codex_cli import CodexCLI
+from fact_checker.adapters.llm_codex_cli import CodexCLI, codex_cli
 from fact_checker.adapters.llm_openai_api import OpenAIAPI
 from fact_checker.adapters.screenshot import screenshot
 from fact_checker.adapters.search_tavily import Tavily
@@ -79,6 +79,22 @@ SHARE_CARD = """<section style="margin-bottom:32px"><img src="{src}" alt="{alt}"
 <p>{copy}</p><textarea rows="8" style="width:540px;max-width:100%" readonly>{alt}</textarea></section>"""
 
 
+OPTIONAL_KEYS = ("HF_TOKEN", "FACT_CHECK_API_KEY")  # speaker separation and published fact-checks
+KEY_TEXTS = {"es": {"title": "Claves", "missing": "falta", "saved": "guardada", "optional": "opcional",
+                    "save": "Guardar", "hint": "Pega la clave y guarda. El valor nunca se muestra."},
+             "en": {"title": "Keys", "missing": "missing", "saved": "saved", "optional": "optional",
+                    "save": "Save", "hint": "Paste the key and save. The value is never shown."}}
+KEY_PAGE = """<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>{title}</title></head>
+<body style="margin:24px;background:#121417;color:#f1f3f5;font:16px -apple-system,Arial,sans-serif">
+<h1 style="font-size:20px">fact-checker · {title}</h1><p>{hint}</p>
+{rows}
+</body></html>"""
+KEY_ROW = """<form method="post" action="/keys?lang={lang}" style="margin-bottom:16px">
+<p><b>{name}</b> · {state}</p><input type="hidden" name="name" value="{name}">
+<input type="password" name="value" autocomplete="off" style="width:420px;max-width:100%"> <button>{save}</button>
+</form>"""
+
+
 def summary_page(data: dict, name: str, series: str | None = None) -> str:
     """The HTML page of the card of `name`, from the flag file with marks."""
     return summary.page(summary.card(data, name, series), SUMMARY_TEMPLATE.read_text(),
@@ -132,6 +148,41 @@ def models(home: Path) -> dict:
 def secret(home: Path, variable: str) -> str | None:
     """The value of a key variable, from the environment or `<home>/.env`."""
     return os.environ.get(variable) or read_env(home).get(variable)
+
+
+def key_names(home: Path) -> list[str]:
+    """Each key variable that the roles need, once: an API provider's key (none for a chat server on this machine),
+    and the search service's key for a search model with no web search."""
+    settings = [role(home, name) for name in ROLES]
+    variables = [s["key_env"] for s in settings
+                 if s["provider"] in API and (s["provider"] != "chat" or needs_key(s["base_url"]))]
+    if settings[ROLES.index("search")]["provider"] not in WEB_SEARCH:
+        variables.append(search_api(home)[0])
+    return list(dict.fromkeys(variables))
+
+
+def write_key(home: Path, name: str, value: str) -> None:
+    """Writes `<name>=<value>` into `<home>/.env`, in place of the line of that name, commented or not; the file is
+    readable only by the person."""
+    home.mkdir(parents=True, exist_ok=True)
+    path = home / ".env"
+    lines = path.read_text().splitlines() if path.exists() else []
+    same = [i for i, line in enumerate(lines) if re.match(rf"#?\s*{name}\s*=", line)]
+    line = f"{name}={value}"
+    lines = [line if i == same[0] else x for i, x in enumerate(lines)
+             if i not in same[1:] or x.lstrip().startswith("#")] if same else [*lines, line]
+    path.touch(mode=0o600)
+    path.chmod(0o600)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def found_tools(home: Path) -> dict:
+    """Whether this process finds, on its own PATH, the command of each subscription provider in use, uv, yt-dlp
+    and ffmpeg: a helper started at login may not find what the person's terminal finds."""
+    commands = {"claude": lambda: shutil.which("claude"), "codex": codex_cli}
+    used = dict.fromkeys(role(home, r)["provider"] for r in ROLES)
+    return {name: bool(commands[name]()) for name in used if name in commands} | \
+        {name: bool(shutil.which(name)) for name in ("uv", "yt-dlp", "ffmpeg")}
 
 
 def role(home: Path, name: str) -> dict:
@@ -589,11 +640,50 @@ def handler(helper: Helper):
             except OSError:
                 writable = False
             self._reply(200, {"app": "fact-checker", "version": feedback.helper_version(), "pid": os.getpid(),
-                              "home": str(helper.home), "writable": writable})
+                              "home": str(helper.home), "writable": writable, "tools": found_tools(helper.home)})
+
+        def _keys(self) -> None:
+            """The key page: each key the settings need, and the optional ones, as missing or saved, with a hidden
+            field to paste it. Only the helper's own address reaches it (no DNS rebinding), and a key is kept only
+            from the page itself (Origin). No value is ever sent back."""
+            own = f"127.0.0.1:{self.server.server_address[1]}"
+            if self.headers.get("Host") != own:
+                return self._reply(403, {"error": "forbidden host"})
+            lang = parse_qs(urlparse(self.path).query).get("lang", ["es"])[0]
+            lang = lang if lang in KEY_TEXTS else "es"
+            names = [*key_names(helper.home), *OPTIONAL_KEYS]
+            if self.command == "POST":
+                if self.headers.get("Origin") != f"http://{own}":
+                    return self._reply(403, {"error": "forbidden origin"})
+                length = int(self.headers.get("Content-Length", 0))
+                if length > 10_000:
+                    return self._reply(400, {"error": "too long"})
+                form = parse_qs(self.rfile.read(length).decode())
+                name, value = form.get("name", [""])[0], form.get("value", [""])[0].strip()
+                if name not in names or not value or any(c in value for c in "\r\n\0"):
+                    return self._reply(400, {"error": "bad key"})
+                write_key(helper.home, name, value)
+                os.environ[name] = value  # the next analysis reads it with no restart
+            words = KEY_TEXTS[lang]
+            rows = "".join(KEY_ROW.format(
+                lang=lang, name=html.escape(name), save=words["save"],
+                state=(words["saved"] if secret(helper.home, name) else words["missing"])
+                + (f" ({words['optional']})" if name in OPTIONAL_KEYS else "")) for name in names)
+            raw = KEY_PAGE.format(lang=lang, title=words["title"], hint=words["hint"], rows=rows).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "
+                             "form-action 'self'; frame-ancestors 'none'")
+            self.end_headers()
+            self.wfile.write(raw)
 
         def do_GET(self):
             if urlparse(self.path).path == "/health":
                 return self._health()
+            if urlparse(self.path).path == "/keys":
+                return self._keys()
             if urlparse(self.path).path == "/share":
                 return self._reply(200, {"share": consent(helper.home)})
             if urlparse(self.path).path == "/provider":  # the analyse button says what a reading spends
@@ -674,6 +764,8 @@ def handler(helper: Helper):
         def do_POST(self):
             if urlparse(self.path).path == "/share":
                 return self._share()
+            if urlparse(self.path).path == "/keys":
+                return self._keys()
             m = re.fullmatch(r"/videos/([A-Za-z0-9_-]{6,20})/(marks|people)", urlparse(self.path).path)
             if m:
                 return self._mark(m[1]) if m[2] == "marks" else self._people(m[1])

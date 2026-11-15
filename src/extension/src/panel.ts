@@ -25,7 +25,8 @@ export const TYPE_COLOR = Object.fromEntries(Object.entries(TYPE_LOOK).map(([typ
  * Under the filters, once the voices are told apart, each speaker with its role; a click on the role switches it
  * between host and guest and calls `setRole`, so the summary follows.
  * With `sharing`, its foot says whether each mark is shared with the project's author, and the ⚙ box switches it;
- * the helper is asked again each time the panel opens.
+ * the helper is asked again each time the panel opens. The ⚙ box's keys button calls `openKeys`: the helper's own page
+ * takes the API keys, so a key never passes through YouTube's page.
  */
 export function mountPanel(
   layer: HTMLElement,
@@ -35,6 +36,7 @@ export function mountPanel(
   exportSummary: () => void = () => {},
   sharing?: Sharing,
   setRole: (name: string, role: "host" | "guest") => void = () => {},
+  openKeys: () => void = () => {},
 ): () => void {
   const strip = div("fc-strip");
   const tip = div("fc-tip fc-s");
@@ -77,7 +79,7 @@ export function mountPanel(
     show(flag);
   };
 
-  // The ⚙ box: text size, card side, quiet mode and language.
+  // The ⚙ box: text size, card side, quiet mode, language and the keys page.
   const box = div("fc-settings");
   box.style.display = "none";
   const drawBox = () => {
@@ -100,6 +102,7 @@ export function mountPanel(
       choice(w.side, "side", [["left", w.left], ["right", w.right]]),
       quiet,
       choice(w.language, "lang", Object.keys(TEXTS).map((l) => [l, l.toUpperCase()])),
+      button(w.keys, openKeys),
     );
     if (sharing && shared !== null) {
       const line = document.createElement("label");

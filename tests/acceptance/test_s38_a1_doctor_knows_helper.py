@@ -34,7 +34,7 @@ def test_doctor_knows_helper(tmp_path, monkeypatch, capsys):
         helper = ThreadingHTTPServer(("127.0.0.1", first + 1), handler(Helper(home)))
         threading.Thread(target=helper.serve_forever, daemon=True).start()
         answer = health(first + 1)
-        assert answer == {"app": "fact-checker", "version": feedback.helper_version(), "pid": os.getpid(),
+        assert {k: v for k, v in answer.items() if k != "tools"} == {"app": "fact-checker", "version": feedback.helper_version(), "pid": os.getpid(),
                           "home": str(home), "writable": True}, f"FAIL S38 A1 · /health: {answer}"
         code, check = helper_check(monkeypatch, capsys)
         assert check == {"name": "helper", "state": f"running on port {first + 1}", "fix": "", "ok": True}, \
