@@ -12,7 +12,7 @@ from fact_checker.feedback import AGENT, helper_version, install_id
 
 # The fields of a flag file that a shared analysis keeps.
 SHARED = ("video_id", "lang", "spoken", "status", "published_at", "title", "channel", "duration", "speakers",
-          "readers", "cost_usd", "analysed_until", "flags")
+          "people", "claims", "questions", "readers", "cost_usd", "analysed_until", "flags")
 UPLOAD_TIMEOUT = 15
 DOWNLOAD_TIMEOUT = 5  # the person waits for it when the video opens
 

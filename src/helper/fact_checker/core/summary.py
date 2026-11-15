@@ -1,63 +1,71 @@
-"""The shareable summary of one video: each speaker's most serious reviewed flags, their counts and the alt text."""
-import math
+"""The profile card of one guest: how many of their checked claims were false or misleading, how serious, the devices
+they repeat, the questions they dodged and their two most serious claims; and its alt text."""
+import base64
 import re
 from collections import Counter
 from html import escape
+from pathlib import Path
 from string import Template
 
-# The colours and icons of the extension cards (src/extension/src/flags.ts), in the order of seriousness.
-FAMILIES = {
-    "false": ("#ff6b6b", "✗"),
-    "contradiction": ("#f06fd0", "⇄"),
-    "question": ("#4dabf7", "?"),
-    "misleading": ("#ff9f43", "!"),
-    "disputed": ("#ffd43b", "≈"),
-    "fallacy": ("#b388ff", "⚑"),
-}
-ORDER = list(FAMILIES)
-MAX_BOXES = 4
-# Every text of the image and its alt text, in the language of the flag file's `lang`.
+FONTS = Path(__file__).parent.parent / "fonts"
+# The labels of a false or misleading claim: the red and amber families of the player.
+WRONG = {"false": "false", "misleading": "misleading", "definition_swap": "misleading", "plan_as_fact": "misleading"}
+SEVERITIES = ("serious", "moderate", "minor")
+DEVICES = ("fallacy", "contradiction")
 TEXTS = {
     "es": {
-        "families": {"false": ("falso", "falsos"), "contradiction": ("contradicción", "contradicciones"),
-                     "question": ("pregunta esquivada", "preguntas esquivadas"), "misleading": ("engañoso", "engañosos"),
-                     "disputed": ("discutido", "discutidos"), "fallacy": ("falacia", "falacias")},
-        "footer": "Señales automáticas, no veredictos · revisado · fact-checker", "bold": "no veredictos",
-        "months": "ene feb mar abr may jun jul ago sep oct nov dic".split(),
-        "video": "Vídeo {}", "more": "y {} más", "and": " y ", "guest": "invitad",
-        "alt": "Resumen de «{}» ({}). Señales automáticas revisadas, no veredictos.", "none": "sin avisos revisados",
-        "alt_more": "Y {} más.", "flags": "avisos", "reviewed": "avisos<br>revisados", "empty": "Sin avisos revisados",
-        "kicker": "Avisos revisados",
+        "kicker": "Entrevista", "months": "ene feb mar abr may jun jul ago sep oct nov dic".split(),
+        "speaking": "{} hablando de {}", "hook": "datos, falsos<br>o engañosos", "of": "de",
+        "verdicts": {"false": ("falso", "falsos"), "misleading": ("engañoso", "engañosos"),
+                     "nitpick": ("puntualiz.", "puntualiz."), "correct": ("correcto", "correctos")},
+        "nitpicks": ("puntualización", "puntualizaciones"),
+        "severity": "Gravedad", "levels": {"serious": ("Grave", "grave", "graves"),
+                                           "moderate": ("Moderado", "moderado", "moderados"),
+                                           "minor": ("Leve", "leve", "leves")},
+        "devices": "Lo que más repite", "no_devices": "Nada",
+        "dodged": ("Esquivó <b>{} de {}</b> pregunta", "Esquivó <b>{} de {}</b> preguntas"),
+        "gravest": "Lo más grave", "no_gravest": "Ningún dato falso o engañoso revisado",
+        "verdict": {"false": "Falso", "misleading": "Engañoso"},
+        "footer": "Detectado con IA · <b>revisado a mano</b> · fuentes en el enlace",
+        "alt": "Ficha de {} en «{}»{}.", "alt_hook": "{} de {} datos, falsos o engañosos", "alt_devices": "Repite",
+        "alt_footer": "Detectado con IA, revisado a mano.",
+        "labels": {"ad_hominem": "Ad hominem", "tu_quoque": "Y tú más", "false_dilemma": "Falso dilema",
+                   "straw_man": "Hombre de paja", "false_cause": "Causa falsa",
+                   "hasty_generalization": "Generalización apresurada", "vague_authority": "Autoridad vaga",
+                   "insinuation": "Insinuación", "double_standard": "Doble rasero",
+                   "cherry_picking": "Datos a conveniencia", "appeal_to_fear": "Apelación al miedo",
+                   "self": "Se contradice", "record": "Contradice lo que dijo antes", "promise": "Promesa incumplida"},
     },
     "en": {
-        "families": {"false": ("false", "false"), "contradiction": ("contradiction", "contradictions"),
-                     "question": ("dodged question", "dodged questions"), "misleading": ("misleading", "misleading"),
-                     "disputed": ("disputed", "disputed"), "fallacy": ("fallacy", "fallacies")},
-        "footer": "Automatic signals, not verdicts · reviewed · fact-checker", "bold": "not verdicts",
-        "months": "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(),
-        "video": "Video {}", "more": "and {} more", "and": " and ", "guest": "guest",
-        "alt": "Summary of «{}» ({}). Reviewed automatic signals, not verdicts.", "none": "no reviewed flags",
-        "alt_more": "And {} more.", "flags": "flags", "reviewed": "reviewed<br>flags", "empty": "No reviewed flags",
-        "kicker": "Reviewed flags",
+        "kicker": "Interview", "months": "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(),
+        "speaking": "{} speaking of {}", "hook": "claims, false<br>or misleading", "of": "of",
+        "verdicts": {"false": ("false", "false"), "misleading": ("misleading", "misleading"),
+                     "nitpick": ("nitpick", "nitpicks"), "correct": ("correct", "correct")},
+        "nitpicks": ("nitpick", "nitpicks"),
+        "severity": "Severity", "levels": {"serious": ("Serious", "serious", "serious"),
+                                           "moderate": ("Moderate", "moderate", "moderate"),
+                                           "minor": ("Minor", "minor", "minor")},
+        "devices": "Repeats most", "no_devices": "Nothing",
+        "dodged": ("Dodged <b>{} of {}</b> question", "Dodged <b>{} of {}</b> questions"),
+        "gravest": "Most serious", "no_gravest": "No reviewed false or misleading claim",
+        "verdict": {"false": "False", "misleading": "Misleading"},
+        "footer": "Detected with AI · <b>reviewed by hand</b> · sources at the link",
+        "alt": "Profile of {} in «{}»{}.", "alt_hook": "{} of {} claims, false or misleading", "alt_devices": "Repeats",
+        "alt_footer": "Detected with AI, reviewed by hand.",
+        "labels": {"ad_hominem": "Ad hominem", "tu_quoque": "Whataboutism", "false_dilemma": "False dilemma",
+                   "straw_man": "Straw man", "false_cause": "False cause",
+                   "hasty_generalization": "Hasty generalization", "vague_authority": "Vague authority",
+                   "insinuation": "Insinuation", "double_standard": "Double standard",
+                   "cherry_picking": "Cherry-picking", "appeal_to_fear": "Appeal to fear",
+                   "self": "Contradicts themself", "record": "Contradicts what they said before",
+                   "promise": "Broken promise"},
     },
 }
-
-
-def family(flag: dict) -> str | None:
-    if flag["type"] == "inaccuracy":
-        return {"false": "false", "disputed": "disputed"}.get(flag["label"], "misleading")
-    return flag["type"] if flag["type"] in FAMILIES else None
 
 
 def speaker(flag: dict) -> str:
     """The judge's speaker when it gave the line to someone else."""
     return (flag.get("judge") or {}).get("speaker") or flag["speaker"]
-
-
-def _rank(flag: dict) -> tuple:
-    # A question answered only in part is the mildest of all.
-    level = len(ORDER) if flag["label"] == "partial" else ORDER.index(family(flag))
-    return level, -flag["confidence"], flag["t"]
 
 
 def minute(t: float) -> str:
@@ -70,197 +78,146 @@ def cut(text: str, size: int) -> str:
     return text if len(text) <= size else text[:size].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
 
-def _meta(data: dict, duration: float, words: dict) -> str:
-    parts = [data.get("channel")]
-    if date := data.get("published_at"):
-        parts.append(_date(date, words))
-    if duration:
-        h, m = divmod(round(duration / 60), 60)
-        parts.append(f"{h} h {m:02} min" if h else f"{m} min")
-    return " · ".join(p for p in parts if p)
+def guests(data: dict) -> list[str]:
+    """The speakers who get a card: the guests once the voices are told apart, else every speaker."""
+    names = list(dict.fromkeys([*data.get("speakers", {}).values(), *(speaker(f) for f in data["flags"])]))
+    people = data.get("people")
+    return [n for n in people if people[n].get("role") == "guest"] if people else names
 
 
-def summarize(data: dict) -> dict:
-    """The flag file with marks in, the content of the image out. Only flags marked correct go in, whatever the
-    judge ruled, each under the judge's speaker.
-
-    With more than four speakers, the four with the most flags in the file (any type, any mark) get a box:
-    the number of flags stands for how much each one speaks. The texts follow the file's `lang`, Spanish without one.
-    """
-    lang = data.get("lang") or "es"
-    words = TEXTS[lang]
-    reviewed = [f for f in data["flags"] if f.get("mark") == "correct" and family(f)]
-    talk = Counter(speaker(f) for f in data["flags"])
-    names = list(dict.fromkeys([*data.get("speakers", {}).values(), *talk]))
-    shown = sorted(names, key=lambda n: -talk[n])[:MAX_BOXES] if len(names) > MAX_BOXES else names
-    shown = [n for n in names if n in shown]
-    per_box = 3 if len(shown) <= 2 else 2
-    # The image lists as many as fit, from this longer list.
-    per_list = {1: 8, 2: 6}.get(len(shown), 4)
-    duration = data.get("duration") or max([f["t"] for f in data["flags"]], default=0)
-    speakers = []
-    for name in shown:
-        own = sorted((f for f in reviewed if speaker(f) == name), key=_rank)
-        counts = Counter(family(f) for f in own)
-        speakers.append({
-            "name": name,
-            "counts": {k: counts[k] for k in ORDER if counts[k]},
-            "flags": own[:per_box],
-            "highlights": own[:per_list],
-            "ticks": [{"t": f["t"], "family": family(f), "confidence": f["confidence"]} for f in own],
-        })
-    more = len(names) - len(shown)
-    return {
-        "lang": lang,
-        "title": data.get("title") or words["video"].format(data["video_id"]),
-        "meta": _meta(data, duration, words),
-        "duration": duration,
-        "speakers": speakers,
-        "more": more,
-        "footer": f"{words['more'].format(more)} · {words['footer']}" if more else words["footer"],
-    }
-
-
-def _counts(counts: dict, words: dict) -> str:
-    return " · ".join(f"{n} {words['families'][k][0 if n == 1 else 1]}" for k, n in counts.items())
+def _length(seconds: float) -> str:
+    h, m = divmod(round(seconds / 60), 60)
+    return f"{h} h {m:02} min" if h else f"{m} min"
 
 
 def _date(date: str, words: dict) -> str:
-    y, m, d = date.split("-")
+    y, m, d = date[:10].split("-")
     return f"{int(d)} {words['months'][int(m) - 1]} {y}"
 
 
-def reference(flag: dict, words: dict) -> str:
-    """What backs the flag, after the type: the first source, the earlier statement, or nothing for a question."""
-    related = flag.get("related") or {}
-    if flag["type"] == "contradiction":
-        if related.get("t") is not None:
-            return f" · vs. {minute(related['t'])}"
-        source = (related.get("source") or {}).get("publisher", "")
-        when = _date(related["date"], words) if related.get("date") else ""
-        parts = [re.split(r"\s+[(–—-]\s*", source)[0], when]
-        return " · " + ", ".join(p for p in parts if p) if any(parts) else ""
-    if flag["type"] == "question" or not flag.get("sources"):
-        return ""
-    return " · " + re.split(r"\s+[(–—-]\s*", flag["sources"][0]["publisher"])[0]
+def _source(flag: dict) -> str:
+    return re.split(r"\s+[(–—-]\s*", flag["sources"][0]["publisher"])[0] if flag.get("sources") else ""
 
 
-def alt_text(summary: dict) -> str:
-    """A plain text of the image for screen readers, within the 1000 characters of an alt text on X."""
-    words = TEXTS[summary["lang"]]
-    lines = [words["alt"].format(summary["title"], summary["meta"])]
-    for s in summary["speakers"]:
-        flags = " ".join(f"{minute(f['t'])} {words['families'][family(f)][0]}{reference(f, words)}: "
-                         f"«{cut(f['quote'], 50)}»" for f in s["highlights"])
-        lines.append(f"{s['name']}: {_counts(s['counts'], words) or words['none']}. {flags}".strip())
-    if summary["more"]:
-        lines.append(words["alt_more"].format(summary["more"]))
-    return cut("\n".join(lines), 1000)
+def card(data: dict, name: str, series: str | None = None) -> dict:
+    """The content of the card of `name` from the flag file with marks. The mark wins, as on the player: a flag
+    marked correct counts under its found verdict, whatever the judge ruled, and one marked unfair counts nowhere. A
+    puntualización is a figure the judge ruled a nitpick and the person did not mark. The counts of checked claims and
+    questions asked come from the file's `claims` and `questions`."""
+    lang = data.get("lang") or "es"
+    words = TEXTS[lang]
+    mine = [f for f in data["flags"] if speaker(f) == name]
+    kept = [f for f in mine if f.get("mark") == "correct"]
+    wrong = [f for f in kept if f["type"] == "inaccuracy" and f["label"] in WRONG]
+    small = [f for f in mine if "mark" not in f and f["type"] == "inaccuracy"
+             and (f.get("judge") or {}).get("verdict") == "nitpick"]
+    level = lambda f: (f.get("judge") or {}).get("severity")
+    # An analysis from before the counts has none: the reviewed flags are then the least that was checked.
+    checked = max((data.get("claims") or {}).get(name, 0), len(wrong) + len(small))
+    dodged = sum(f["type"] == "question" for f in kept)
+    kinds = Counter(WRONG[f["label"]] for f in wrong)
+    person = (data.get("people") or {}).get(name, {})
+    spoken, duration = person.get("spoken_s"), data.get("duration")
+    gravest = sorted(wrong, key=lambda f: (SEVERITIES.index(level(f)) if level(f) in SEVERITIES else 3,
+                                           WRONG[f["label"]] != "false", -f["confidence"], f["t"]))[:2]
+    return {
+        "lang": lang,
+        "name": person.get("person") or re.sub(r"\s*\(.*\)$", "", name),
+        "title": data.get("title") or data["video_id"],
+        "date": _date(data["published_at"], words) if data.get("published_at") else "",
+        "length": words["speaking"].format(_length(spoken), _length(duration)) if spoken and duration
+        else _length(duration) if duration else "",
+        "series": series or "",
+        "wrong": len(wrong),
+        "checked": checked,
+        "verdicts": {"false": kinds["false"], "misleading": kinds["misleading"], "nitpick": len(small),
+                     "correct": checked - len(wrong) - len(small)},
+        "severity": {s: sum(level(f) == s for f in wrong) for s in SEVERITIES},
+        "devices": Counter(words["labels"].get(f["label"], f["label"]) for f in kept
+                           if f["type"] in DEVICES).most_common(3),
+        "dodged": dodged,
+        "asked": max((data.get("questions") or {}).get(name, 0), dodged),
+        "gravest": [{"t": f["t"], "quote": f["quote"], "kind": WRONG[f["label"]], "severity": level(f),
+                     "correction": f["reason"], "source": _source(f)} for f in gravest],
+    }
 
 
-def _person(name: str) -> tuple[str, str]:
-    """ "Ana Ruiz (invitada)" → ("Ana Ruiz", "invitada")."""
-    m = re.fullmatch(r"(.*?)\s*\((.*)\)", name)
-    return (m[1], m[2]) if m else (name, "")
+def _verdict(item: dict, words: dict) -> str:
+    """ "Falso, grave." """
+    severity = item["severity"] in SEVERITIES and words["levels"][item["severity"]][1]
+    return f"{words['verdict'][item['kind']]}{', ' + severity if severity else ''}."
 
 
-def _badge(kind: str, size: str = "") -> str:
-    color, icon = FAMILIES[kind]
-    return f'<i class="badge" style="background:{color}{size}">{icon}</i>'
+def alt_text(c: dict) -> str:
+    """A plain text of the card for screen readers, within the 1000 characters of an alt text on X."""
+    words = TEXTS[c["lang"]]
+    plural = lambda n, forms: forms[0] if n == 1 else forms[-1]
+    names = dict(words["verdicts"], nitpick=words["nitpicks"])
+    head = [words["alt"].format(c["name"], cut(c["title"], 80), f" ({c['date']})" if c["date"] else "")]
+    if c["series"]:
+        head.append(f"{cut(c['series'], 60)}.")
+    counts = ", ".join(f"{n} {plural(n, names[k])}" for k, n in c["verdicts"].items() if n)
+    head.append(f"{words['alt_hook'].format(c['wrong'], c['checked'])}{': ' + counts if counts else ''}.")
+    severity = ", ".join(f"{n} {plural(n, words['levels'][s][1:])}" for s, n in c["severity"].items() if n)
+    if severity:
+        head.append(f"{words['severity']}: {severity}.")
+    if c["devices"]:
+        head.append(f"{words['alt_devices']}: {', '.join(f'{label} ×{n}' for label, n in c['devices'])}.")
+    head.append(re.sub(r"</?b>", "", plural(c["asked"], words["dodged"]).format(c["dodged"], c["asked"])) + ".")
+    tail = [words["alt_footer"]]
+    room = 1000 - len(" ".join(head + tail)) - 2
+    items = [f"{minute(g['t'])} «{g['quote']}» {_verdict(g, words)} {g['correction']}"
+             + (f" ({g['source']})" if g["source"] else "") for g in c["gravest"]]
+    gravest = [cut(item, max(room // max(len(items), 1) - 1, 0)) for item in items]
+    return cut(" ".join(head + gravest + tail), 1000)
 
 
-def _donut(counts: dict, size: int) -> str:
-    """An inline SVG ring of the counts by family, with a 2 px surface gap between the arcs."""
-    width = size * 0.08
-    r = (size - width) / 2
-    around = 2 * math.pi * r
-    total = sum(counts.values())
-    gap = 3 if len(counts) > 1 else 0
-    arcs, start = [], 0.0
-    for kind, n in counts.items():
-        length = n / total * around
-        arcs.append(f'<circle r="{r:.1f}" fill="none" stroke="{FAMILIES[kind][0]}" stroke-width="{width:.1f}" '
-                    f'stroke-dasharray="{max(length - gap, 1):.1f} {around:.1f}" stroke-dashoffset="{-start:.1f}"/>')
-        start += length
-    return (f'<svg width="{size}" height="{size}" viewBox="{-size / 2} {-size / 2} {size} {size}">'
-            f'<g transform="rotate(-90)"><circle r="{r:.1f}" fill="none" stroke="#262b32" stroke-width="{width:.1f}"/>'
-            f'{"".join(arcs)}</g></svg>')
+def _icon(symbol: str, color: str) -> str:
+    return f'<svg class="vi vc-{color}" width="30" height="30" aria-hidden="true"><use href="#f2-{symbol}"></use></svg>'
 
 
-def _step(duration: float) -> int:
-    """The tick step in seconds that gives at most seven ticks."""
-    return next((m * 60 for m in (1, 2, 5, 10, 15, 20, 30, 60) if duration / (m * 60) <= 7), 7200)
+def _fonts() -> str:
+    """The @font-face rules with each font file inline, so the card asks the network for nothing."""
+    data = lambda m: "url(data:font/woff2;base64," + base64.b64encode((FONTS / m[1]).read_bytes()).decode() + ")"
+    return re.sub(r"url\(([\w-]+\.woff2)\)", data, (FONTS / "fonts.css").read_text())
 
 
-def _timeline(speakers: list, duration: float) -> str:
-    rows = []
-    for s in speakers:
-        # The mildest first, so the most serious marker sits on top where two overlap.
-        ticks = sorted(s["ticks"], key=lambda k: -ORDER.index(k["family"]))
-        dots = "".join(
-            f'<i style="left:{min(100, k["t"] / duration * 100):.2f}%;width:{d}px;height:{d}px;'
-            f'background:{FAMILIES[k["family"]][0]}"></i>'
-            for k in ticks for d in [round(12 + 16 * max(0, k["confidence"] - 0.5) * 2)])
-        rows.append(f'<div class="row"><span class="who">{escape(_person(s["name"])[0])}</span>'
-                    f'<div class="track">{dots}</div></div>')
-    step = _step(duration)
-    ticks = "".join(f'<span style="left:{t / duration * 100:.2f}%">{t // 3600}:{t // 60 % 60:02}</span>'
-                    f'<b style="left:{t / duration * 100:.2f}%"></b>'
-                    for t in range(0, int(duration) + 1, step))
-    return "".join(rows) + f'<div class="axis">{ticks}</div>'
+LOOKS = {"false": ("fa", "fa", "--red"), "misleading": ("en", "en", "--amber"), "nitpick": ("en", "pu", "--grey"),
+         "correct": ("ok", "ok", "--green")}
+ORDER = ("false", "misleading", "nitpick", "correct")  # the verdict bar, false first
 
 
-def _item(flag: dict, words: dict) -> str:
-    """One highlight: badge, minute, type and reference on one line, the quote under it."""
-    kind = family(flag)
-    return (f'<div class="item" style="border-color:{FAMILIES[kind][0]}">'
-            f'<p class="ref clamp">{_badge(kind)}<b>{minute(flag["t"])}</b> {words["families"][kind][0]}'
-            f'<span class="muted">{escape(reference(flag, words))}</span></p>'
-            f'<p class="quote clamp">«{escape(cut(flag["quote"], 160))}»</p></div>')
-
-
-def _headline(summary: dict, words: dict) -> tuple[str, str]:
-    """The big line and the small one: the guests over the whole title, else the title split at its first separator."""
-    guests = [_person(s["name"])[0] for s in summary["speakers"] if _person(s["name"])[1].startswith(words["guest"])]
-    if guests:
-        return words["and"].join(guests), summary["title"]
-    m = re.fullmatch(r"(.*?)(?: \| | - | — |: )(.*)", summary["title"])
-    return (m[1], m[2]) if m else (summary["title"], "")
-
-
-def page(summary: dict, template: str, image: str | None = None) -> str:
-    """The HTML page of the image: hero, timeline, one panel per speaker with a donut and a list of quotes, footer.
-
-    `image` is the video thumbnail as a data URI; without it the hero is a gradient. Each panel gets the longer
-    list of highlights; a script in the template drops the last ones that do not fit.
-    """
-    words = TEXTS[summary["lang"]]
-    speakers = summary["speakers"]
-    many = len(speakers) > 2
-    donut = 120 if many else 176
-    # A small donut has room for the number and one word only.
-    label = words["flags"] if many else words["reviewed"]
-    columns = []
-    for s in speakers:
-        name, role = _person(s["name"])
-        total = sum(s["counts"].values())
-        legend = "".join(f'<span class="chip">{_badge(k)}{n}</span>' for k, n in s["counts"].items())
-        items = "".join(_item(f, words) for f in s["highlights"]) or f'<p class="none">{words["empty"]}</p>'
-        columns.append(
-            f'<section class="speaker"><div class="head">'
-            f'<div class="donut">{_donut(s["counts"], donut)}<div><strong>{total}</strong><span>{label}</span></div></div>'
-            f'<div class="side"><h2 class="clamp{" one" if many else ""}">{escape(name)}</h2>'
-            + (f'<p class="role clamp one">{escape(role)}</p>' if role else "")
-            + f'<div class="legend">{legend}</div></div></div>'
-            f'<div class="items">{items}</div></section>')
-    legend = "".join(f'<span class="chip">{_badge(k)}{words["families"][k][0]}</span>' for k in ORDER)
-    footer = escape(summary["footer"]).replace(words["bold"], f"<b>{words['bold']}</b>")
-    hero = f'url("{image}")' if image else "linear-gradient(135deg, #3a1d4f, #12304a 55%, #0b0d10)"
-    headline, subtitle = _headline(summary, words)
-    return Template(template).substitute(lang=summary["lang"], kicker=words["kicker"],
-        hero=hero, hero_height="190px" if many else "250px", row_height="30px" if many else "38px",
-        donut_size=f"{donut}px", total_size="36px" if many else "44px",
-        title=escape(headline), subtitle=escape(subtitle), meta=escape(summary["meta"]),
-        timeline=_timeline(speakers, summary["duration"] or 1),
-        layout="four" if many else "one" if len(speakers) == 1 else "two", columns="".join(columns),
-        legend=legend, footer=footer)
+def page(c: dict, template: str, image: str | None = None) -> str:
+    """The HTML page of the card, 1080×1350. `image` is the video thumbnail as a data URI; without it the plate is a
+    gradient."""
+    words = TEXTS[c["lang"]]
+    v = c["verdicts"]
+    bar = "".join(f'<i style="flex:{v[k]};background:var({LOOKS[k][2]})"></i>' for k in ORDER if v[k])
+    legend = "".join(f'<div class="leg">{_icon(LOOKS[k][0], LOOKS[k][1])}<span><b class="num">{v[k]}</b> '
+                     f'{words["verdicts"][k][0 if v[k] == 1 else 1]}</span></div>' for k in ORDER)
+    top = max(c["severity"].values()) or 1
+    severity = "".join(
+        f'<div class="sev{" muted" if s == "minor" else ""}"><span>{words["levels"][s][0]}</span>'
+        f'<span class="track"><i style="width:{n / top * 100:.0f}%;opacity:{(1, .55, .3)[i]}"></i></span>'
+        f'<span class="num">{n}</span></div>' for i, (s, n) in enumerate(c["severity"].items()))
+    devices = "".join(f'<div class="row">{_icon("re", "re")}<span class="grow">{escape(label)}</span>'
+                      f'<span class="num bone">×{n}</span></div>' for label, n in c["devices"]) \
+        or f'<div class="row muted">{words["no_devices"]}</div>'
+    gravest = "".join(
+        f'<div class="item"><div class="q">{_icon(LOOKS[g["kind"]][0], LOOKS[g["kind"]][1])}'
+        f'<span class="quote">«{escape(cut(g["quote"], 60))}»</span><span class="min num">{minute(g["t"])}</span></div>'
+        f'<div class="fix"><b class="c-{g["kind"]}">{escape(_verdict(g, words))}</b> {escape(cut(g["correction"], 110))}'
+        + (f' <span class="src">{escape(cut(g["source"], 30))}</span>' if g["source"] else "") + '</div></div>'
+        for g in c["gravest"]) or f'<div class="item muted">{words["no_gravest"]}</div>'
+    plate = (f'<img class="p-dim" src="{image}" alt=""><div class="band"><img src="{image}" alt=""></div>'
+             if image else '<div class="p-none"></div>')
+    sub = " · ".join(x for x in (f"«{escape(cut(c['title'], 40))}»", escape(c["length"])) if x)
+    dodged = words["dodged"][0 if c["asked"] == 1 else 1].format(c["dodged"], c["asked"])
+    return Template(template).substitute(
+        lang=c["lang"], fonts=_fonts(), wordmark=(FONTS / "calvet-wordmark.svg").read_text(), plate=plate,
+        kicker=escape(" · ".join(x for x in (words["kicker"], c["date"]) if x)),
+        series=f'<div class="sc ab series">{escape(c["series"])}</div>' if c["series"] else "",
+        name=escape(c["name"]), name_size=92 if len(c["name"]) <= 18 else 72 if len(c["name"]) <= 24 else 56,
+        sub=sub, wrong=c["wrong"], of=words["of"], checked=c["checked"], hook=words["hook"], bar=bar, legend=legend,
+        severity_head=words["severity"], severity=severity, devices_head=words["devices"], devices=devices,
+        dodged=dodged, gravest_head=words["gravest"], gravest=gravest, footer=words["footer"])

@@ -1,4 +1,4 @@
-import { HUES, look, TEXT_1, TEXT_2, title, verdict, type Flag, type FlagFile, type Look } from "./flags";
+import { HUES, look, severity, TEXT_1, TEXT_2, title, verdict, type Flag, type FlagFile, type Look } from "./flags";
 import { browserLang, TEXTS, type Lang, type Words } from "./texts";
 
 const ON_PLAYER = 0.8;
@@ -107,6 +107,8 @@ const STYLE = `
 .fc-flt button{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:999px;font-size:12px;color:var(--t2)}
 .fc-flt button.on{color:var(--t1);background:rgba(255,255,255,.08);box-shadow:0 0 0 .5px rgba(255,255,255,.12),inset 0 .5px 0 rgba(255,255,255,.08)}
 .fc-n{color:var(--t2);font-size:12px}
+.fc-people{margin:10px 0 0;font-size:12px;color:var(--t2)}
+.fc-people button{padding:0 4px;color:var(--t1);text-decoration:underline dotted}
 .fc-flt .fc-dot{width:14px;height:14px;background-size:14px 14px}
 .fc-panel .fc-fault{margin:12px 0 0;flex-shrink:0}
 .fc-list{position:relative;flex:1;overflow-y:auto;padding:4px 8px 8px;scrollbar-width:none;
@@ -191,9 +193,16 @@ const seconds = (f: Flag) => f.type === "context"
   ? Math.min(READ_MAX, Math.max(SHOW_FOR, (f.quote.length + f.reason.length) / READ_CHARS_PER_S))
   : SHOW_FOR;
 
+/** Quiet mode: a serious flag once judged; before the judge rates it, a flag at QUIET confidence or more. */
+const loud = (f: Flag) => {
+  if (verdict(f) === "nitpick") return false;
+  const rated = severity(f);
+  return rated ? rated === "serious" : f.confidence >= QUIET;
+};
+
 /** The normal display rule: a flag shows on the player in its own seconds, without a pin. */
 export const shows = (f: Flag) =>
-  SHOWN_TYPES.includes(f.type) && onPlayer(f) && verdict(f) !== "drop" && (!settings.quiet || f.confidence >= QUIET);
+  SHOWN_TYPES.includes(f.type) && onPlayer(f) && verdict(f) !== "drop" && (!settings.quiet || loud(f));
 
 export type OnMark = (flag: Flag, verdict: "correct" | "unfair", reason: string) => void;
 

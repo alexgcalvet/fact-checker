@@ -56,6 +56,7 @@
     }
   };
   var NITPICK_NAME = { es: "Puntualizaci\xF3n", en: "Nitpick" };
+  var SERIOUS_NAME = { es: "grave", en: "serious" };
   var HUES = {
     er: { text: "#F49A9C", marker: "#E5484D" },
     mi: { text: "#F0BE6A", marker: "#D99A2B" },
@@ -103,7 +104,8 @@
   var FAMILIES = [FALSE.family, RHETORIC.family, CONTEXT.family, NITPICK.family];
   var verdict = (f) => f.mark === "correct" ? void 0 : f.judge?.verdict;
   var look = (f) => verdict(f) === "nitpick" ? NITPICK : LABEL_LOOK[f.label] ?? TYPE_LOOK[f.type];
-  var title = (f, lang2 = "es") => verdict(f) === "nitpick" ? NITPICK_NAME[lang2] : LABELS[lang2][f.label] ?? f.label;
+  var severity = (f) => verdict(f) === "nitpick" ? void 0 : f.judge?.severity;
+  var title = (f, lang2 = "es") => verdict(f) === "nitpick" ? NITPICK_NAME[lang2] : (LABELS[lang2][f.label] ?? f.label) + (severity(f) === "serious" ? ` \xB7 ${SERIOUS_NAME[lang2]}` : "");
 
   // src/texts.ts
   var AGENT_GUIDE = "https://github.com/alexgcalvet/fact-checker/blob/main/INSTALL-AGENT.md";
@@ -120,6 +122,7 @@
     es: {
       labels: LABELS.es,
       nitpick: NITPICK_NAME.es,
+      serious: SERIOUS_NAME.es,
       families: { Falsos: "Falsos", Ret\u00F3rica: "Ret\xF3rica", Contexto: "Contexto", Puntualizaciones: "Puntualizaciones" },
       confidence: "Confianza",
       pin: "Fijar (P)",
@@ -162,6 +165,7 @@
       export: "Exportar resumen",
       settings: "Ajustes",
       all: "Todos",
+      roles: { host: "Host", guest: "Invitada" },
       live: "Ir al directo",
       dropped: "Descartado por el juez",
       droppedAll: (n) => `Descartados por el juez (${n})`,
@@ -169,7 +173,7 @@
       side: "Tarjetas",
       left: "izquierda",
       right: "derecha",
-      quiet: "Solo alta confianza",
+      quiet: "Solo graves",
       language: "Idioma",
       analyze: "Analizar este v\xEDdeo",
       preparing: "Preparando el an\xE1lisis\u2026",
@@ -208,6 +212,7 @@
     en: {
       labels: LABELS.en,
       nitpick: NITPICK_NAME.en,
+      serious: SERIOUS_NAME.en,
       families: { Falsos: "False", Ret\u00F3rica: "Rhetoric", Contexto: "Context", Puntualizaciones: "Nitpicks" },
       confidence: "Confidence",
       pin: "Pin (P)",
@@ -250,6 +255,7 @@
       export: "Export summary",
       settings: "Settings",
       all: "All",
+      roles: { host: "Host", guest: "Guest" },
       live: "Jump to now",
       dropped: "Dropped by the judge",
       droppedAll: (n) => `Dropped by the judge (${n})`,
@@ -257,7 +263,7 @@
       side: "Cards",
       left: "left",
       right: "right",
-      quiet: "High confidence only",
+      quiet: "Serious only",
       language: "Language",
       analyze: "Analyze this video",
       preparing: "Preparing the analysis\u2026",
@@ -395,6 +401,8 @@
 .fc-flt button{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:999px;font-size:12px;color:var(--t2)}
 .fc-flt button.on{color:var(--t1);background:rgba(255,255,255,.08);box-shadow:0 0 0 .5px rgba(255,255,255,.12),inset 0 .5px 0 rgba(255,255,255,.08)}
 .fc-n{color:var(--t2);font-size:12px}
+.fc-people{margin:10px 0 0;font-size:12px;color:var(--t2)}
+.fc-people button{padding:0 4px;color:var(--t1);text-decoration:underline dotted}
 .fc-flt .fc-dot{width:14px;height:14px;background-size:14px 14px}
 .fc-panel .fc-fault{margin:12px 0 0;flex-shrink:0}
 .fc-list{position:relative;flex:1;overflow-y:auto;padding:4px 8px 8px;scrollbar-width:none;
@@ -471,7 +479,12 @@
     layer.dispatchEvent(new Event("fc-settings"));
   }
   var seconds = (f) => f.type === "context" ? Math.min(READ_MAX, Math.max(SHOW_FOR, (f.quote.length + f.reason.length) / READ_CHARS_PER_S)) : SHOW_FOR;
-  var shows = (f) => SHOWN_TYPES.includes(f.type) && onPlayer(f) && verdict(f) !== "drop" && (!settings.quiet || f.confidence >= QUIET);
+  var loud = (f) => {
+    if (verdict(f) === "nitpick") return false;
+    const rated = severity(f);
+    return rated ? rated === "serious" : f.confidence >= QUIET;
+  };
+  var shows = (f) => SHOWN_TYPES.includes(f.type) && onPlayer(f) && verdict(f) !== "drop" && (!settings.quiet || loud(f));
   function button(text, onClick, className = "fc-btn") {
     const b = document.createElement("button");
     b.className = className;
@@ -815,7 +828,8 @@
   var STRIP_MIDDLE = 9;
   var TYPE_COLOR = Object.fromEntries(Object.entries(TYPE_LOOK).map(([type, l]) => [type, l.mark]));
   function mountPanel(layer, video, getFlags, show, exportSummary = () => {
-  }, sharing) {
+  }, sharing, setRole = () => {
+  }) {
     const strip = div("fc-strip");
     const tip = div("fc-tip fc-s");
     tip.hidden = true;
@@ -922,7 +936,8 @@
       const analysed = file?.status === "done" ? 100 : Math.min(100, (file?.analysed_until ?? 0) / video.duration * 100);
       const preparing = file?.status === "running" && file.first_flags_s === void 0;
       const stop = file?.status === "stopped" ? file.stop_reason : void 0;
-      const key = `${lang()}|${video.duration}|${analysed}|${only}|${preparing}|${stop}|${flags2.map((f) => f.id).join("|")}`;
+      const people = Object.entries(file?.people ?? {});
+      const key = `${lang()}|${video.duration}|${analysed}|${only}|${preparing}|${stop}|${flags2.map((f) => f.id).join("|")}|` + people.map(([name, p]) => `${name}:${p.role}`).join("|");
       if (key === drawn) return;
       drawn = key;
       const w = words();
@@ -987,6 +1002,20 @@
       }
       const top = div("fc-fh");
       top.append(head, box, filters);
+      if (people.length) {
+        const list2 = div("fc-people");
+        for (const [name, p] of people) {
+          const line = div("");
+          line.append(span("", p.person), " \xB7 ", button(w.roles[p.role], () => {
+            p.role = p.role === "host" ? "guest" : "host";
+            p.set_by = "person";
+            setRole(name, p.role);
+            render();
+          }, ""));
+          list2.append(line);
+        }
+        top.append(list2);
+      }
       rows = flags2.filter((f) => !only || look(f).family === only).map((f) => {
         const l = look(f);
         const row = div("fc-row");
@@ -1172,7 +1201,8 @@
       () => flags,
       overlay.show,
       () => send({ kind: "summary", videoId }),
-      { get: () => shareReply({ kind: "share", videoId }), set: (on) => shareReply({ kind: "set-share", videoId, share: on }) }
+      { get: () => shareReply({ kind: "share", videoId }), set: (on) => shareReply({ kind: "set-share", videoId, share: on }) },
+      (name, role) => send({ kind: "role", videoId, name, role })
     );
     unmount = () => {
       unmountPanel();

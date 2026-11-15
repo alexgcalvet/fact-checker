@@ -75,7 +75,8 @@ async function start() {
   };
   const unmountPanel = mountPanel(overlay.layer, video, () => flags, overlay.show,
     () => send({ kind: "summary", videoId }),
-    { get: () => shareReply({ kind: "share", videoId }), set: (on) => shareReply({ kind: "set-share", videoId, share: on }) });
+    { get: () => shareReply({ kind: "share", videoId }), set: (on) => shareReply({ kind: "set-share", videoId, share: on }) },
+    (name, role) => send({ kind: "role", videoId, name, role }));
   unmount = () => { unmountPanel(); overlay.unmount(); };
   // The service worker answers `down` when nothing listens on the helper's port: not installed, or not running.
   const notice = div("fc-down fc-s");

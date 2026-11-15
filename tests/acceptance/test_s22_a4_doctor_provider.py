@@ -34,9 +34,12 @@ def run(monkeypatch, capsys, *args) -> tuple[int, list[str]]:
 
 
 class Helper(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(404)
+    def do_GET(self):  # S38: doctor knows the helper by its /health
+        raw = b'{"app": "fact-checker", "writable": true}' if self.path == "/health" else b""
+        self.send_response(200 if raw else 404)
+        self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
+        self.wfile.write(raw)
 
     def log_message(self, *args):
         pass

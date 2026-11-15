@@ -8,6 +8,7 @@ from fact_checker.core.summary import minute
 WINDOW = 7200  # one reading per started two video-hours
 TIMEOUT = 900  # seconds: one reading of up to two hours of conversation
 STAMP = 60  # a minute stamp at each change of speaker and at least once a minute
+SEVERITIES = ("minor", "moderate", "serious")
 
 SCHEMA = {
     "type": "object",
@@ -21,8 +22,9 @@ SCHEMA = {
                     "verdict": {"type": "string", "enum": ["keep", "nitpick"]},
                     "reason": {"type": "string"},
                     "speaker": {"type": ["string", "null"]},
+                    "severity": {"type": ["string", "null"], "enum": ["minor", "moderate", "serious", None]},
                 },
-                "required": ["id", "verdict", "reason", "speaker"],
+                "required": ["id", "verdict", "reason", "speaker", "severity"],
                 "additionalProperties": False,
             },
         }
@@ -60,12 +62,18 @@ RULES = """\
   said, or calling the new case different without saying how it differs on the point at stake does not
   reconcile them: keep the flag. If his explanation does reconcile them, the verdict is "nitpick".
 - Keep a flag that survives all of the above. When in doubt, keep it.
+- Severity. Rate each kept flag "minor", "moderate" or "serious"; a nitpick gets null. Rate by how much the error
+  changes the point, how central the claim is to what the speaker argues, and how big the error is. Never rate by
+  what the speaker meant: intent does not count. "serious": the error changes the conclusion of a central claim, or
+  it is large (a figure off by half or more, an event that did not happen). "moderate": it weakens a claim that
+  matters to the argument. "minor": a side remark, or a weak argument that changes little. Most kept flags are not
+  serious: keep "serious" for the few that a viewer must not miss.
 """
 
 PROMPT = """You review the flags that an automatic analyst found in a {spoken} conversation. It read the
 conversation part by part, so it can miss who speaks to whom, the rest of a sentence, or how much a small
 error matters. You read the whole conversation and rule on each flag: "keep" or "nitpick" (a minor correction),
-with one short reason in {reader}. For a nitpick, the reason states the correction, such as
+with one short reason in {reader}, and the severity of each kept flag. For a nitpick, the reason states the correction, such as
 "{example}".
 
 Rules:
@@ -115,7 +123,7 @@ def _flag(f: dict) -> str:
 
 
 def judge(flags: list[dict], transcript: Transcript, llm, reader: str | None = None) -> dict[str, dict]:
-    """Flag id → `{verdict, reason, speaker?}` for every non-context flag, one model call per two-hour window. The
+    """Flag id → `{verdict, reason, severity?, speaker?}` for every non-context flag, one model call per two-hour window. The
     reasons are in `reader`, by default the language of the conversation."""
     spoken = transcript.language
     reader = reader or spoken
@@ -137,6 +145,8 @@ def judge(flags: list[dict], transcript: Transcript, llm, reader: str | None = N
                 continue
             # A provider that does not enforce the schema can still answer "drop": the judge drops no flag.
             ruling = {"verdict": "nitpick" if r["verdict"] == "nitpick" else "keep", "reason": r["reason"]}
+            if ruling["verdict"] == "keep" and r.get("severity") in SEVERITIES:
+                ruling["severity"] = r["severity"]
             if r.get("speaker") in names and r["speaker"] != f["speaker"]:
                 ruling["speaker"] = r["speaker"]
             out[f["id"]] = ruling

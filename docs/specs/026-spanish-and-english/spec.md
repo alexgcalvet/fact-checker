@@ -19,7 +19,7 @@ Today every text of fact-checker is Spanish and the helper reads only Spanish vi
   - **Story:** A person with a Spanish browser clicks "Analizar este vídeo" on that English interview: the extension sends its language, and the part, fact-check and judge readings ask for reasons in Spanish about an English conversation; the flag file says `lang` "es" and the quote stays English. An English viewer of a Spanish video gets readings that ask for English reasons. With no language sent, the reasons follow the video's language.
   - **Test:** `tests/acceptance/test_s26_a3_reasons_in_viewer_language.py`, `tests/acceptance/s26-a3-analyze-sends-language.test.ts`
 - [X] A4 · The shareable summary follows the interface language
-  - **Story:** A person whose flag file says `lang` "en" exports the summary: the image says "Reviewed flags", "false" and "Automatic signals, not verdicts", and the page says "Alt text, ready to copy" above an alt text that starts "Summary of". A file with `lang` "es", or none, keeps today's Spanish texts.
+  - **Story:** A person whose flag file says `lang` "en" exports the card (S35): the image says "claims, false or misleading", "False." and "Detected with AI", and the page says "Alt text, ready to copy" above an alt text that starts "Profile of". A file with `lang` "es", or none, keeps the Spanish texts.
   - **Test:** `tests/acceptance/test_s26_a4_summary_language.py`
 
 ## Files

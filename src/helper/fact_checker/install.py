@@ -7,8 +7,10 @@ import platform
 import plistlib
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -17,12 +19,15 @@ from pathlib import Path
 from fact_checker.adapters import whisper
 from fact_checker.adapters.screenshot import find_chrome
 from fact_checker.adapters.llm_chat_api import needs_key
-from fact_checker.server import API, ROLES, WEB_SEARCH, provider, read_env, role, search_api, secret, speech_cli
+from fact_checker.adapters.llm_codex_cli import CHATGPT_CODEX
+from fact_checker.server import (API, ROLES, WEB_SEARCH, ports, provider, read_env, role, search_api, secret,
+                                 speech_cli)
 from fact_checker.store import default_home
 
 LABEL = "com.fact-checker.helper"
 UNIT = "fact-checker.service"
 HERE = Path(__file__).parent
+WAIT = 5.0  # seconds that setup waits for an old helper to stop and for the login helper to answer
 NO_AGENT_CLI = ("provider: no agent CLI logged in · fix: claude auth login (Claude subscription) or codex login "
                 "(ChatGPT subscription); to install one, see INSTALL-AGENT.md")
 
@@ -53,9 +58,15 @@ def _claude() -> Check:
     return Check("claude", "logged in") if logged_in else Check("claude", "not logged in", "claude auth login", ok=False)
 
 
+def codex_cli() -> str | None:
+    """The Codex command: CODEX_BIN or `codex` on PATH, else the one that ships inside the ChatGPT app."""
+    return shutil.which(os.environ.get("CODEX_BIN", "codex")) or (str(CHATGPT_CODEX) if CHATGPT_CODEX.is_file()
+                                                                   else None)
+
+
 def _codex() -> Check:
-    codex = os.environ.get("CODEX_BIN", "codex")
-    if not shutil.which(codex):
+    codex = codex_cli()
+    if not codex:
         return Check("codex", "missing", "install Codex CLI, or set CODEX_BIN", ok=False)
     status = subprocess.run([codex, "login", "status"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
     return Check("codex", "logged in") if status.returncode == 0 else Check("codex", "not logged in", "codex login", ok=False)
@@ -91,17 +102,50 @@ def tools(system: str, home: Path) -> list[Check]:
     ]
 
 
-def _helper(port: int) -> Check:
+SANDBOX_FIX = ("run fact-checker setup, then fact-checker doctor, outside the sandbox, "
+               "with the person's approval")
+
+
+def health(port: int) -> dict | None:
+    """What answers GET /health on a local port: the helper's JSON, {} for another program, None for nothing.
+    PermissionError means the agent's sandbox blocks local connections."""
     try:
-        urllib.request.urlopen(f"http://127.0.0.1:{port}/videos/doctor", timeout=2)
-    except urllib.error.HTTPError:
-        pass  # any HTTP answer means the helper is there
-    except OSError:
-        return Check("helper", f"not running on port {port}", "fact-checker setup", ok=False)
-    return Check("helper", f"running on port {port}")
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as res:
+            answer = json.loads(res.read())
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, PermissionError):
+            raise e.reason
+        return {} if isinstance(e, urllib.error.HTTPError) else None
+    except PermissionError:
+        raise
+    except (OSError, ValueError):  # a program that answers, but not with JSON
+        return {}
+    return answer if isinstance(answer, dict) and answer.get("app") == "fact-checker" else {}
 
 
-def doctor(port: int, as_json: bool = False) -> int:
+def _helper(ports) -> Check:
+    """The helper found by /health over `ports`; another program on a port is not the helper."""
+    found = {}
+    try:
+        for port in ports:
+            found[port] = health(port)
+            if found[port]:
+                break
+    except PermissionError:
+        return Check("helper", "blocked by the agent's sandbox", SANDBOX_FIX, ok=False)
+    helper = next(((p, h) for p, h in found.items() if h), None)
+    if helper and not helper[1]["writable"]:
+        return Check("helper", f"running on port {helper[0]}, cannot write {helper[1]['home']}",
+                     f"stop it, then {SANDBOX_FIX}", ok=False)
+    if helper:
+        return Check("helper", f"running on port {helper[0]}")
+    foreign = next((p for p, h in found.items() if h == {}), None)
+    if foreign is not None:
+        return Check("helper", f"another program holds port {foreign}", "fact-checker setup", ok=False)
+    return Check("helper", f"not running on port {ports[0]}", "fact-checker setup", ok=False)
+
+
+def doctor(port: int | None, as_json: bool = False) -> int:
     system = platform.system()
     home = default_home()
     env = read_env(home) | os.environ
@@ -114,7 +158,7 @@ def doctor(port: int, as_json: bool = False) -> int:
           for name, r in roles.items()],
         *_keys(home),
         *tools(system, home),
-        _helper(port),
+        _helper([port] if port else ports()),
         Check("speech to text", ("mlx-whisper" if engine == whisper.CLI else "faster-whisper") if engine else "missing",
               "" if engine else "install uv (see uv above)"),
         Check("speaker separation", "on") if env.get("HF_TOKEN") else
@@ -134,7 +178,9 @@ def doctor(port: int, as_json: bool = False) -> int:
 
 
 def launchd_plist(command: list[str], path: str, log: Path) -> bytes:
-    return plistlib.dumps({"Label": LABEL, "ProgramArguments": command, "RunAtLoad": True, "KeepAlive": True,
+    return plistlib.dumps({"Label": LABEL, "ProgramArguments": command, "RunAtLoad": True,
+                           # Restarted after a crash, not after the clean stop of a helper with every port taken.
+                           "KeepAlive": {"SuccessfulExit": False},
                            "EnvironmentVariables": {"PATH": path},
                            "StandardOutPath": str(log), "StandardErrorPath": str(log)})
 
@@ -162,6 +208,37 @@ def settings_files(home: Path, provider: str | None) -> None:
     if not keys.exists():
         shutil.copy(HERE / "env.example", keys)
         print(f"keys: {keys} (add a key with fact-checker key set <NAME>)")
+
+
+def write_provider(home: Path, name: str) -> None:
+    """Writes `provider = "<name>"` into `<home>/config.toml`: in place of its line above every table, or first; every
+    other line stays."""
+    path = home / "config.toml"
+    text = path.read_text()
+    table = re.search(r"(?m)^\[", text)
+    end = table.start() if table else len(text)
+    line = f'provider = "{name}"'
+    head, found = re.subn(r"(?m)^provider\s*=.*$", line, text[:end], count=1)
+    path.write_text(head + text[end:] if found else f"{line}\n{text}")
+
+
+def set_provider(home: Path, name: str | None) -> int:
+    """Prints the provider in use; with `name`, a logged-in subscription, writes it into the settings and restarts
+    the login helper."""
+    if not name:
+        print(f"provider: {provider(home)}")
+        return 0
+    check = _llm(name)[0]
+    if not check.ok:
+        print(check)
+        return 1
+    settings_files(home, name)
+    write_provider(home, name)
+    restart = {"Darwin": ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{LABEL}"],
+               "Linux": ["systemctl", "--user", "restart", UNIT]}.get(platform.system())
+    restarted = restart and subprocess.run(restart, capture_output=True).returncode == 0
+    print(f"provider: {name}" + ("; the helper restarted" if restarted else " · fix: fact-checker setup"))
+    return 0
 
 
 def set_key(home: Path, name: str) -> int:
@@ -196,15 +273,41 @@ def extension(home: Path) -> Path:
     return target
 
 
-def setup(port: int) -> int:
-    """Checks the tools, then installs the helper as a launchd agent (macOS) or a systemd user service (Linux)."""
+def stop_helpers(home: Path, ports) -> None:
+    """Stops each fact-checker helper of this home that answers on `ports`, such as one an agent started by hand;
+    another program, or the helper of another home, keeps running."""
+    for port in ports:
+        found = health(port)
+        if found and found["home"] == str(home) and found["pid"] != os.getpid():
+            os.kill(found["pid"], signal.SIGTERM)
+            wait(lambda: health(port) is None)
+            print(f"helper: stopped the old helper on port {port}")
+
+
+def wait(test, seconds: float = WAIT) -> bool:
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if test():
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def setup(port: int | None, name: str | None = None) -> int:
+    """Checks the tools, then installs the helper as a launchd agent (macOS) or a systemd user service (Linux).
+    `name` is the subscription to read with; without it, a new settings file names the first one logged in."""
     system = platform.system()
     home = default_home()
-    found = None if (home / "config.toml").exists() else logged_in_cli()
+    if name and not (check := _llm(name)[0]).ok:
+        print(check)
+        return 1
+    found = name or (None if (home / "config.toml").exists() else logged_in_cli())
     if not found and not (home / "config.toml").exists():
         print(NO_AGENT_CLI)
         return 1
     settings_files(home, found)
+    if name:
+        write_provider(home, name)
     missing = [c for c in tools(system, home) if not c.ok]
     if missing:
         for check in missing:
@@ -212,7 +315,12 @@ def setup(port: int) -> int:
         return 1
     folder = extension(home)
     # An autostarted helper gets a bare PATH: it keeps the one of this shell, where every tool was found.
-    command, path = [sys.executable, "-m", "fact_checker.cli", "serve", "--port", str(port)], os.environ["PATH"]
+    command = [sys.executable, "-m", "fact_checker.cli", "serve", *(["--port", str(port)] if port else [])]
+    path, tries = os.environ["PATH"], [port] if port else ports()
+    codex = codex_cli()
+    if codex and "codex" in {role(home, r)["provider"] for r in ROLES} and \
+            str(Path(codex).parent) not in path.split(os.pathsep):
+        path += os.pathsep + str(Path(codex).parent)  # such as the Codex inside the ChatGPT app
     if system == "Darwin":
         agent = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
         agent.parent.mkdir(parents=True, exist_ok=True)
@@ -220,18 +328,29 @@ def setup(port: int) -> int:
         agent.write_bytes(launchd_plist(command, path, default_home() / "server.log"))
         domain = f"gui/{os.getuid()}"
         subprocess.run(["launchctl", "bootout", f"{domain}/{LABEL}"], capture_output=True)
+        stop_helpers(home, tries)
         subprocess.run(["launchctl", "bootstrap", domain, str(agent)], check=True)
         print(f"helper: starts at login ({agent})")
     elif system == "Linux":
         unit = Path.home() / ".config" / "systemd" / "user" / UNIT
         unit.parent.mkdir(parents=True, exist_ok=True)
         unit.write_text(systemd_unit(command, path))
+        subprocess.run(["systemctl", "--user", "stop", UNIT], capture_output=True)
+        stop_helpers(home, tries)
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
         subprocess.run(["systemctl", "--user", "enable", "--now", UNIT], check=True)
         print(f"helper: starts at login ({unit})")
     else:
         print(f"helper: no autostart on {system} · fix: run fact-checker serve by hand")
         return 1
+    running = None
+
+    def answers() -> bool:
+        nonlocal running
+        running = next((p for p in tries if (health(p) or {}).get("home") == str(home)), None)
+        return running is not None
+    print(f"helper: running on port {running}" if wait(answers) else
+          f"helper: not answering yet · fix: fact-checker doctor (log: {home / 'server.log'})")
     print(f"next: load {folder} in Chrome (chrome://extensions → Developer mode → Load unpacked), "
           "then run fact-checker doctor")
     return 0

@@ -1,11 +1,11 @@
-"""S26 A4 · The shareable summary follows the interface language
+"""S26 A4 · The shareable card follows the interface language
 
-Story: A person whose flag file says `lang` "en" exports the summary: the image says "Reviewed flags", "false" and
-"Automatic signals, not verdicts", and the page says "Alt text, ready to copy" above an alt text that starts
-"Summary of". A file with `lang` "es", or none, keeps today's Spanish texts.
+Story: A person whose flag file says `lang` "en" exports the card (S35): the image says "claims, false or misleading",
+"False." and "Detected with AI", and the page says "Alt text, ready to copy" above an alt text that starts
+"Profile of". A file with `lang` "es", or none, keeps the Spanish texts.
 
 Setup: an invented flag file with one guest and a false figure marked correct, saved three times in a temporary helper
-home: with `lang` "en", with `lang` "es" and with no `lang`. The image page is built from the summary and the image
+home: with `lang` "en", with `lang` "es" and with no `lang`. The image page is built from the card and the image
 template, as the PNG route builds it but with no thumbnail; the share page and the alt text come from the helper's own
 HTTP server on a free local port.
 """
@@ -35,32 +35,32 @@ def test_summary_language(tmp_path):
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(tmp_path)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     get = lambda path: urllib.request.urlopen(f"http://127.0.0.1:{httpd.server_port}{path}", timeout=10).read().decode()
-    html = lambda video: summary.page(summary.summarize(store.load(video) | {"flags": [FLAG | {"mark": "correct"}]}),
-                                      server.SUMMARY_TEMPLATE.read_text())
-    # The image's words, without the markup that bolds a part of the footer.
-    words = lambda video: re.sub(r"<[^>]+>", "", html(video))
+    html = lambda video: summary.page(summary.card(store.load(video) | {"flags": [FLAG | {"mark": "correct"}]},
+                                                   FLAG["speaker"]), server.SUMMARY_TEMPLATE.read_text())
+    # The image's words, without the markup, styles or line breaks.
+    words = lambda video: " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", "", html(video), flags=re.S)).split())
     try:
-        # Case 1 · lang "en" → the image in English: the kicker, the type of the flag and the footer
-        for text in ("Reviewed flags", "false", "Automatic signals, not verdicts"):
+        # Case 1 · lang "en" → the card in English: the hook, the verdict of the flag and the footer
+        for text in ("claims, false or misleading", "False.", "Detected with AI"):
             assert text in words("enfile"), f"FAIL S26 A4 · the English image lacks {text!r}"
-        for text in ("Avisos revisados", "falso", "Señales automáticas"):
+        for text in ("datos, falsos", "Falso.", "Detectado con IA"):
             assert text not in words("enfile"), f"FAIL S26 A4 · the English image still says {text!r}"
         assert '<html lang="en">' in html("enfile"), "FAIL S26 A4 · the English image page is not lang en"
 
         # Case 2 · lang "en" → the share page and the alt text in English
         page, alt = get("/videos/enfile/summary"), get("/videos/enfile/summary.txt")
         assert "Alt text, ready to copy" in page and 'lang="en"' in page, "FAIL S26 A4 · the share page is not English"
-        assert alt.startswith("Summary of «An invented interview»"), f"FAIL S26 A4 · alt text {alt[:60]!r}"
-        assert "0:10 false" in alt, f"FAIL S26 A4 · alt text {alt!r}"
+        assert alt.startswith("Profile of Ann Lee in «An invented interview»"), f"FAIL S26 A4 · alt text {alt[:60]!r}"
+        assert "0:10" in alt and "False." in alt, f"FAIL S26 A4 · alt text {alt!r}"
 
-        # Case 3 · lang "es", or no lang (an older file) → today's Spanish texts
+        # Case 3 · lang "es", or no lang (an older file) → the Spanish texts
         for video in ("esfile", "oldfile"):
             image, page, alt = words(video), get(f"/videos/{video}/summary"), get(f"/videos/{video}/summary.txt")
-            assert "Avisos revisados" in image and "Señales automáticas, no veredictos" in image, \
+            assert "datos, falsos o engañosos" in image and "Detectado con IA" in image, \
                 f"FAIL S26 A4 · {video}: the image is not Spanish"
             assert "Texto alternativo, listo para copiar" in page, f"FAIL S26 A4 · {video}: the share page is not Spanish"
-            assert alt.startswith("Resumen de «An invented interview»") and "0:10 falso" in alt, \
+            assert alt.startswith("Ficha de Ann Lee en «An invented interview»") and "Falso." in alt, \
                 f"FAIL S26 A4 · {video}: alt text {alt[:80]!r}"
     finally:
         httpd.shutdown()
-    print("PASS S26 A4 · The shareable summary follows the interface language")
+    print("PASS S26 A4 · The shareable card follows the interface language")

@@ -142,9 +142,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="fact-checker")
     sub = parser.add_subparsers(dest="command", required=True)
     serve = sub.add_parser("serve")
-    serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument("--port", type=int, help="one fixed port; without it, the first free one of 8765–8769")
     analyze = sub.add_parser("analyze")
     analyze.add_argument("url")
+    analyze.add_argument("--lang", choices=["es", "en"], help="the language of reasons and summary; default: the video's")
     evaluate = sub.add_parser("eval")
     evaluate.add_argument("--save", action="store_true", help="write the bars of the provider in use")
     evaluate.add_argument("--marks", action="store_true", help="only the real precision from the person's marks")
@@ -154,9 +155,14 @@ def main() -> None:
     for name, text in (("setup", "check the tools and start the helper at every login"),
                        ("doctor", "say what is missing, one line each, with the fix")):
         command = sub.add_parser(name, help=text)
-        command.add_argument("--port", type=int, default=8765)
+        command.add_argument("--port", type=int, help="one fixed port; without it, the helper's ports 8765–8769")
         if name == "doctor":
             command.add_argument("--json", action="store_true", help="the checks as JSON, for an agent")
+        else:
+            command.add_argument("--provider", choices=["claude", "codex"],
+                                 help="the subscription to read with: the agent that installs names itself")
+    reader = sub.add_parser("provider", help="print the provider in use, or switch to another and restart the helper")
+    reader.add_argument("name", nargs="?", choices=["claude", "codex"])
     key = sub.add_parser("key", help="store a key in ~/.fact-checker/.env")
     key.add_subparsers(dest="action", required=True).add_parser(
         "set", help="type a key in a hidden prompt").add_argument("name", help="the variable, such as HF_TOKEN")
@@ -174,7 +180,10 @@ def main() -> None:
     if args.command == "key":
         raise SystemExit(install.set_key(default_home(), args.name))
     if args.command in ("setup", "doctor"):
-        raise SystemExit(install.setup(args.port) if args.command == "setup" else install.doctor(args.port, args.json))
+        raise SystemExit(install.setup(args.port, args.provider) if args.command == "setup"
+                         else install.doctor(args.port, args.json))
+    if args.command == "provider":
+        raise SystemExit(install.set_provider(default_home(), args.name))
 
     if args.command == "shared":
         if args.action != "list" and not args.lang:
@@ -198,11 +207,12 @@ def main() -> None:
     if args.command == "serve":
         server.serve(args.port)
     elif args.command == "analyze":
+        # The helper's own analysis with no viewer to follow: the whole video, voices and judge included.
         home = default_home()
+        for name, value in server.read_env(home).items():
+            os.environ.setdefault(name, value)
         video_id = args.url.split("v=")[-1].split("&")[0]
-        server.run_analysis(video_id, 0, transcript=YouTube(home / "captions"),
-                            llm=server.provider_llm(home, "search"),
-                            factcheck=factcheck, home=home)
+        server.Helper(home)._run(video_id, 0.0, lang=args.lang)
         print(home / "videos" / f"{video_id}.json")
     else:
         if not args.marks:

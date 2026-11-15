@@ -23,8 +23,10 @@ export interface Flag {
   /** The person's latest mark, added by the helper on GET. */
   mark?: "correct" | "unfair";
   /** The judge's ruling after the whole video: `speaker` when the line belongs to someone else. */
-  judge?: { verdict: "keep" | "nitpick" | "drop"; reason: string; speaker?: string };
+  judge?: { verdict: "keep" | "nitpick" | "drop"; reason: string; speaker?: string; severity?: Severity };
 }
+
+export type Severity = "minor" | "moderate" | "serious";
 
 export interface FlagFile {
   video_id: string;
@@ -37,6 +39,8 @@ export interface FlagFile {
   first_flags_s?: number;
   /** "shared" when the flags came from another person's analysis through the author's collector. */
   source?: "shared";
+  /** Per speaker name, once the voices are told apart: the role, the person's name, seconds of speech, who set the role. */
+  people?: Record<string, { role: "host" | "guest"; person: string; spoken_s: number; set_by: "llm" | "person" }>;
   flags: Flag[];
 }
 
@@ -96,6 +100,7 @@ export const LABELS: Record<"es" | "en", Record<string, string>> = {
   },
 };
 export const NITPICK_NAME = { es: "Puntualización", en: "Nitpick" };
+export const SERIOUS_NAME = { es: "grave", en: "serious" };
 
 /**
  * The verdict look of a flag: its word (`word`), its 16 px disc (`dot`, a CSS background image), the hue of its
@@ -163,6 +168,10 @@ export const verdict = (f: Pick<Flag, "judge" | "mark">) => (f.mark === "correct
 export const look = (f: Pick<Flag, "type" | "label" | "judge" | "mark">): Look =>
   verdict(f) === "nitpick" ? NITPICK : LABEL_LOOK[f.label] ?? TYPE_LOOK[f.type];
 
-/** The card title: "Puntualización" for a nitpick, else the name of the label, in the interface language. */
+/** The judge's severity of a kept flag; a nitpick has none. */
+export const severity = (f: Pick<Flag, "judge" | "mark">) => (verdict(f) === "nitpick" ? undefined : f.judge?.severity);
+
+/** The card title: "Puntualización" for a nitpick, else the name of the label, with "· grave" when serious. */
 export const title = (f: Flag, lang: "es" | "en" = "es") =>
-  (verdict(f) === "nitpick" ? NITPICK_NAME[lang] : LABELS[lang][f.label] ?? f.label);
+  (verdict(f) === "nitpick" ? NITPICK_NAME[lang]
+    : (LABELS[lang][f.label] ?? f.label) + (severity(f) === "serious" ? ` · ${SERIOUS_NAME[lang]}` : ""));

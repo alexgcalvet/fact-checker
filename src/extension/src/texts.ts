@@ -1,5 +1,5 @@
 // Every text a person reads, per language. The interface speaks the browser's language unless the ⚙ box picks one.
-import { LABELS, NITPICK_NAME } from "./flags";
+import { LABELS, NITPICK_NAME, SERIOUS_NAME } from "./flags";
 
 export const AGENT_GUIDE = "https://github.com/alexgcalvet/fact-checker/blob/main/INSTALL-AGENT.md";
 export const PRIVACY = "https://github.com/alexgcalvet/fact-checker/blob/main/PRIVACY.md";
@@ -19,6 +19,7 @@ export const TEXTS = {
   es: {
     labels: LABELS.es,
     nitpick: NITPICK_NAME.es,
+    serious: SERIOUS_NAME.es,
     families: { Falsos: "Falsos", Retórica: "Retórica", Contexto: "Contexto", Puntualizaciones: "Puntualizaciones" } as
       Record<string, string>,
     confidence: "Confianza",
@@ -52,6 +53,7 @@ export const TEXTS = {
     export: "Exportar resumen",
     settings: "Ajustes",
     all: "Todos",
+    roles: { host: "Host", guest: "Invitada" },
     live: "Ir al directo",
     dropped: "Descartado por el juez",
     droppedAll: (n: number) => `Descartados por el juez (${n})`,
@@ -59,7 +61,7 @@ export const TEXTS = {
     side: "Tarjetas",
     left: "izquierda",
     right: "derecha",
-    quiet: "Solo alta confianza",
+    quiet: "Solo graves",
     language: "Idioma",
     analyze: "Analizar este vídeo",
     preparing: "Preparando el análisis…",
@@ -98,6 +100,7 @@ export const TEXTS = {
   en: {
     labels: LABELS.en,
     nitpick: NITPICK_NAME.en,
+    serious: SERIOUS_NAME.en,
     families: { Falsos: "False", Retórica: "Rhetoric", Contexto: "Context", Puntualizaciones: "Nitpicks" } as
       Record<string, string>,
     confidence: "Confidence",
@@ -131,6 +134,7 @@ export const TEXTS = {
     export: "Export summary",
     settings: "Settings",
     all: "All",
+    roles: { host: "Host", guest: "Guest" },
     live: "Jump to now",
     dropped: "Dropped by the judge",
     droppedAll: (n: number) => `Dropped by the judge (${n})`,
@@ -138,7 +142,7 @@ export const TEXTS = {
     side: "Cards",
     left: "left",
     right: "right",
-    quiet: "High confidence only",
+    quiet: "Serious only",
     language: "Language",
     analyze: "Analyze this video",
     preparing: "Preparing the analysis…",

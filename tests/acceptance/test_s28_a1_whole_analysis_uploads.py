@@ -2,7 +2,8 @@
 
 Story: A tester with sharing on clicks "Analizar este vídeo" at 0:00 on an invented 23-second interview. When the
 analysis ends, the collector gets one upload for that video and language "es": the flags, the judge's verdicts, the
-readers (claude, opus), `lang`, `spoken`, the cost and the helper version, and no mark, stop reason or other field.
+readers (claude, opus), `lang`, `spoken`, the cost, the helper version and the counts of checked claims and
+questions per speaker (S35), and no mark, stop reason or other field.
 The tester starts another video at 0:15: its analysis ends with the first 15 seconds unread, and nothing is uploaded.
 
 Setup: s26_fakes (a fake `yt-dlp` with invented captions, a fake `claude` that answers by schema, a failing `codex`),
@@ -23,7 +24,7 @@ from s26_fakes import setup
 from s28_fakes import FakeCollector
 
 ALLOWED = {"video_id", "lang", "spoken", "status", "published_at", "title", "channel", "duration", "speakers",
-           "readers", "cost_usd", "analysed_until", "helper_version", "flags"}
+           "claims", "questions", "readers", "cost_usd", "analysed_until", "helper_version", "flags"}
 
 
 def analyse(base: str, video: str, start: int) -> dict:

@@ -14,8 +14,9 @@ SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"voice": {"type": "string"}, "name": {"type": "string"}},
-                "required": ["voice", "name"],
+                "properties": {"voice": {"type": "string"}, "name": {"type": "string"},
+                               "role": {"type": "string", "enum": ["host", "guest"]}, "person": {"type": "string"}},
+                "required": ["voice", "name", "role", "person"],
                 "additionalProperties": False,
             },
         }
@@ -28,7 +29,11 @@ PROMPT = """Below is the opening of a {spoken} video. Each line starts with a vo
 Name each voice: the person's name if the conversation says it, followed by the role in {reader} in brackets, such
 as {named} or {role}. Use a role alone when no name is said. Two voices never get
 the same name.
+Give each voice its role: "host" for whoever leads the conversation and asks the questions, "guest" for everyone else.
+Give each voice its person: the full name of that person, from the conversation, else from the video title; the
+voice's name when neither says it.
 
+Video title: {title}
 Voices: {voices}
 Do not use any tool. Answer only with the JSON.
 
@@ -67,9 +72,10 @@ def labeled(segments: list[Segment], names: dict[str, str]) -> str:
     return "\n".join(" ".join(line) for line in lines)
 
 
-def name(transcript: Transcript, llm, reader: str | None = None) -> dict[str, str]:
-    """Voice → name or role, from the opening of the conversation, in one model call; the roles in `reader`, by
-    default the language of the conversation."""
+def name(transcript: Transcript, llm, reader: str | None = None) -> dict[str, dict]:
+    """Voice → {name, role, person}, from the opening of the conversation and the video title, in one model call. The
+    name is the person's or a role in `reader`, by default the language of the conversation; the role is `host` or
+    `guest`."""
     voices = sorted({s.speaker for s in transcript.segments if s.speaker})
     if not voices:
         return {}
@@ -78,10 +84,25 @@ def name(transcript: Transcript, llm, reader: str | None = None) -> dict[str, st
     reader = reader or spoken
     named, role = ROLES[reader]
     text = PROMPT.format(voices=", ".join(voices), opening=labeled(opening, {}), spoken=NAMES[spoken],
-                         reader=NAMES[reader], named=named, role=role)
+                         reader=NAMES[reader], named=named, role=role, title=transcript.title or "")
     answer = llm.complete(Prompt("", text, language=spoken), SCHEMA)
-    names = {v["voice"]: v["name"].strip() for v in answer.get("speakers", []) if v["voice"] in voices}
-    return {v: names.get(v) or v for v in voices}
+    given = {v["voice"]: v for v in answer.get("speakers", []) if v["voice"] in voices}
+    found = {}
+    for v in voices:
+        answer = given.get(v, {})
+        label = (answer.get("name") or "").strip() or v
+        found[v] = {"name": label, "role": "host" if answer.get("role") == "host" else "guest",
+                    "person": (answer.get("person") or "").strip() or label}
+    return found
+
+
+def people(named: dict[str, dict], turns: list[dict]) -> dict[str, dict]:
+    """Speaker name → {role, person, spoken_s, set_by: "llm"}, the seconds of speech summed over the voice turns."""
+    spoken: dict[str, float] = {}
+    for turn in turns:
+        spoken[turn["speaker"]] = spoken.get(turn["speaker"], 0) + turn["end"] - turn["start"]
+    return {n["name"]: {"role": n["role"], "person": n["person"], "spoken_s": round(spoken.get(v, 0)), "set_by": "llm"}
+            for v, n in named.items()}
 
 
 def voice_at(transcript: Transcript, t: float) -> str | None:

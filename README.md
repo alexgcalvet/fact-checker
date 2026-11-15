@@ -9,6 +9,8 @@ Fallacies, false figures, contradictions and dodged questions, flagged at the se
 
 [Install in one sentence](INSTALL-AGENT.md) · [How it works](#-how-it-works) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md)
 
+<sub>AI agent: if a person gave you only this repository's URL, follow <a href="INSTALL-AGENT.md">INSTALL-AGENT.md</a> to install fact-checker.</sub>
+
 ![status](https://img.shields.io/badge/status-beta-E6DCC4)
 ![languages](https://img.shields.io/badge/videos-espa%C3%B1ol%20%7C%20English-9DB2D6)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-C4B5E8)

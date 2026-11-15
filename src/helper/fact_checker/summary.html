@@ -3,121 +3,118 @@
 <head>
 <meta charset="utf-8">
 <style>
-  * { box-sizing: border-box; margin: 0; }
-  html, body { width: 1080px; height: 1350px; overflow: hidden; }
-  body {
-    display: flex; flex-direction: column; gap: 16px; padding-bottom: 18px;
-    background: #0b0d10; color: #f4f5f7; font: 26px/1.25 -apple-system, "Helvetica Neue", Arial, sans-serif;
-  }
-  .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-  .clamp.one { -webkit-line-clamp: 1; }
-  .clamp.three { -webkit-line-clamp: 3; }
-  .muted { color: #9aa2ad; }
+$fonts
+/* The InterviewCard of the CALVET canvas, 4:5: night, bone titles, verdict colours; every text 30 px or more. */
+:root{--n0:#05070B;--bone:#E6DCC4;--warm:#FFF0D6;--t1:rgba(238,236,229,.95);--t2:rgba(226,229,234,.6);--t3:rgba(214,219,227,.55);--grey:#5A6680;--green:#29A98E;--amber:#D99A2B;--red:#E5484D;--mag:#D06BA8;--twa:#F0BE6A;--ter:#F49A9C}
+*{box-sizing:border-box;margin:0}
+html,body{width:1080px;height:1350px;overflow:hidden;background:#07090D}
+.root{position:relative;width:1080px;height:1350px;overflow:hidden;padding:0 72px;display:flex;flex-direction:column;color:var(--t1);font:450 30px/1.25 'Host Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.ab{position:absolute}
+.num{font-variant-numeric:tabular-nums}
+.bone{color:var(--bone)}
+.muted{color:var(--t2)}
+.sc{font:500 30px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(238,236,229,.78);white-space:nowrap}
+.series{top:100px;left:72px;color:var(--bone);text-transform:none;letter-spacing:.04em}
+h1{left:72px;right:72px;top:196px;font:400 ${name_size}px/0.95 'Newsreader',serif;letter-spacing:-.01em;color:var(--bone);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{left:72px;right:72px;top:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vi{display:block;flex-shrink:0;overflow:visible}
+.vc-fa{color:var(--red)}.vc-en{color:var(--amber)}.vc-re{color:var(--mag)}.vc-ok{color:var(--green)}.vc-pu{color:var(--grey)}
+.c-false{color:var(--ter)}.c-misleading{color:var(--twa)}
 
-  /* Hero: the video thumbnail under a dark gradient. */
-  section.title {
-    flex: none; position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px;
-    height: $hero_height; padding: 0 44px 20px;
-    background: $hero center / cover no-repeat;
-  }
-  section.title::before {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(11,13,16,.15) 0%, rgba(11,13,16,.72) 50%, #0b0d10 100%),
-                linear-gradient(90deg, rgba(11,13,16,.7) 0%, rgba(11,13,16,0) 75%);
-  }
-  section.title > * { position: relative; }
-  .kicker {
-    flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 16px 4px 12px; border-radius: 999px;
-    background: rgba(255,107,107,.16); color: #fff; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-  }
-  .kicker i { width: 14px; height: 14px; border-radius: 50%; background: #ff6b6b; box-shadow: 0 0 0 5px rgba(255,107,107,.25); }
-  section.title h1 { font-size: 60px; line-height: 1.08; font-weight: 850; letter-spacing: -.02em; text-shadow: 0 2px 18px rgba(0,0,0,.6); }
-  section.title .subtitle { font-size: 30px; line-height: 1.2; font-weight: 600; color: #e9ecef; }
-  section.title .subtitle:empty { display: none; }
-  section.title .subtitle.four { -webkit-line-clamp: 1; }
-  section.title .meta { display: flex; align-items: center; gap: 16px; font-size: 28px; color: #d0d5db; }
-  section.title .meta p { min-width: 0; }
+/* The cover plate: the thumbnail dimmed, a 45deg band at full colour, cut by the Fault. */
+.plate{left:0;top:0;width:1080px;height:381px;overflow:hidden;clip-path:polygon(0 0,1080px 0,1080px 360px,660px 360px,640px 380px,0 380px)}
+.plate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 35%;display:block}
+.p-dim{filter:brightness(.62) saturate(.85)}
+.band{position:absolute;inset:0;clip-path:polygon(1110px 0,1450px 0,1070px 380px,730px 380px)}
+/* The band keeps its colour on a pale or grey thumbnail: a little more saturation and a warm multiply. */
+.band img{filter:saturate(1.35) brightness(.92)}
+.band::after{content:"";position:absolute;inset:0;background:rgba(216,168,78,.42);mix-blend-mode:multiply}
+.p-none{position:absolute;inset:0;background:linear-gradient(135deg,#1C2433,#0F131B 60%,#07090D)}
+.p-edge{position:absolute;inset:0;background:rgba(230,220,196,.3);clip-path:polygon(1110px 0,1112px 0,732px 380px,730px 380px)}
+.p-veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,9,13,.55) 0%,rgba(7,9,13,0) 30%,rgba(7,9,13,0) 62%,rgba(7,9,13,.85) 100%)}
+.p-side{position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,9,13,.78) 0%,rgba(7,9,13,.45) 42%,rgba(7,9,13,0) 62%)}
+/* The Fault: a 1px horizon that steps once at 45deg. */
+.fault{left:0;right:0;top:360px;height:21px;--s:20px;--x:640px;--fc:230,220,196}
+.fault>i{position:absolute;height:1px;display:block}
+.f-a{left:0;top:var(--s);width:var(--x);background:linear-gradient(90deg,rgba(var(--fc),0),rgba(var(--fc),.6))}
+.f-d{left:var(--x);top:var(--s);width:calc(var(--s) * 1.4142);background:rgba(var(--fc),.75);transform-origin:0 0;transform:rotate(-45deg)}
+.f-b{left:calc(var(--x) + var(--s));right:0;top:0;background:linear-gradient(90deg,rgba(var(--fc),.85),rgba(var(--fc),0))}
+.logo{right:64px;top:38px;width:240px;height:56px}
+.logo svg{width:240px;height:56px}
 
-  /* Timeline: one track per speaker over the whole video. */
-  section.timeline { flex: none; margin: 0 32px; padding: 12px 24px 6px; border-radius: 22px; background: #15181d; }
-  .row { display: flex; align-items: center; gap: 18px; height: $row_height; }
-  .who { width: 210px; flex: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
-  .track { position: relative; flex: 1; height: 6px; border-radius: 3px; background: #2c323a; }
-  .track i { position: absolute; top: 50%; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px #15181d; }
-  .axis { position: relative; height: 36px; margin: 4px 14px 0 228px; border-top: 1px solid #2c323a; }
-  .axis span { position: absolute; top: 2px; transform: translateX(-50%); color: #8a929c; font-variant-numeric: tabular-nums; }
-  .axis span:first-child { transform: none; }
-  .axis span:last-child:not(:first-child) { transform: translateX(-100%); }
-  .axis b { position: absolute; top: -7px; width: 1px; height: 7px; background: #4a525c; }
+/* Hook, verdict bar and its legend. */
+.hook{margin-top:416px;display:flex;align-items:flex-end;gap:28px}
+.big{font-size:132px;font-weight:300;letter-spacing:-.045em;line-height:.9;color:var(--bone)}
+.big span{color:var(--t3);font-size:68px;letter-spacing:-.03em;margin-left:22px}
+.hook p{padding-bottom:6px}
+.bar{display:flex;gap:3px;height:20px;margin-top:22px}
+.bar>i{display:block;border-radius:4px}
+.legend{margin-top:16px;display:flex;justify-content:space-between;gap:24px}
+.leg{display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--t2)}
+.leg b{color:var(--t1);font-weight:550}
 
-  /* Face-off: one panel per speaker. */
-  .columns { flex: 1; min-height: 0; display: grid; gap: 18px; margin: 0 32px; grid-template-columns: 1fr 1fr; }
-  .columns.one { grid-template-columns: 1fr; }
-  .columns.four { grid-template-rows: 1fr 1fr; }
-  .columns.four section.speaker:nth-child(3):last-child { grid-column: span 2; }
-  section.speaker {
-    min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 20px 22px 18px;
-    border-radius: 22px; background: linear-gradient(180deg, #1a1e24, #13161a); overflow: hidden;
-  }
-  .head { display: flex; align-items: center; gap: 22px; }
-  .donut { position: relative; flex: none; width: $donut_size; height: $donut_size; }
-  .donut svg { position: absolute; inset: 0; }
-  .donut div { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.02; }
-  .donut strong { font-size: $total_size; font-weight: 850; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .donut span { color: #9aa2ad; }
-  .side { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 10px; }
-  .side h2 { font-size: 34px; line-height: 1.1; font-weight: 850; letter-spacing: -.01em; }
-  .side .role { margin-top: -4px; color: #9aa2ad; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
-  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; }
-  .chip { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .chip em { font-style: normal; font-weight: 400; color: #9aa2ad; }
-  .badge {
-    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
-    border-radius: 50%; color: #0b0d10; font-weight: 900; font-style: normal; line-height: 1;
-  }
+/* Severity counts and the devices the guest repeats, side by side. */
+.cols{margin-top:44px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:56px}
+.h2{font-weight:550;letter-spacing:-.005em}
+.list{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.sev{display:grid;grid-template-columns:150px 1fr 56px;align-items:center;gap:16px}
+.sev .track{height:12px;border-radius:3px;background:#1C2433;position:relative}
+.sev .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--bone)}
+.sev .num{text-align:right;color:var(--bone)}
+.row{display:flex;align-items:center;gap:14px;white-space:nowrap}
+.grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dodged{margin-top:24px}
+.dodged b{font-weight:550;color:var(--bone)}
 
-  /* Highlights: the most serious reviewed flags, as many as fit. */
-  .items { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
-  .item {
-    flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 2px;
-    padding: 5px 14px 7px 16px; border-radius: 14px; background: #0f1215; border-left: 5px solid;
-  }
-  .ref { font-weight: 700; }
-  .ref .badge { width: 30px; height: 30px; margin-right: 8px; vertical-align: -4px; }
-  .ref b { font-variant-numeric: tabular-nums; margin-right: 4px; }
-  .ref .muted { font-weight: 400; }
-  .quote { font-size: 27px; line-height: 1.17; font-style: italic; color: #e3e6ea; }
-  .four .head { gap: 20px; }
-  .four section.speaker { gap: 10px; padding: 16px 20px; }
-  .four .side { gap: 6px; }
-  .four .side h2 { font-size: 34px; }
-  .four .quote { -webkit-line-clamp: 1; }
-  .four .items { gap: 6px; }
-  .four .item { padding: 4px 14px 6px 16px; }
-  .none { flex: 1; display: flex; align-items: center; justify-content: center; color: #8a929c; }
-
-  section.footer { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 32px; }
-  section.footer .legend { justify-content: center; gap: 6px 14px; }
-  section.footer .chip { gap: 6px; }
-  section.footer .chip { font-weight: 400; color: #b4bac2; }
-  section.footer .badge { width: 28px; height: 28px; }
-  section.footer p { color: #8a929c; }
-  section.footer p b { color: #f4f5f7; }
+/* The two most serious: quote and minute, then verdict, correction and source. */
+.gravest{margin-top:32px}
+.items{margin-top:8px;display:flex;flex-direction:column}
+.item{padding:10px 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.item:last-child{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -1px 0 rgba(255,255,255,.08)}
+.q{display:flex;align-items:center;gap:14px}
+.quote{flex:1;min-width:0;font:italic 400 32px/1.15 'Newsreader',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.min{font:500 30px/1 'JetBrains Mono',monospace;color:var(--t2)}
+.fix{margin-top:4px;padding-left:44px;color:var(--t2);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.fix b{font-weight:550}
+.src{color:var(--t3)}
+.foot{left:72px;right:72px;bottom:32px;color:var(--t2);white-space:nowrap}
+.foot b{color:var(--t1);font-weight:500}
 </style>
 </head>
 <body>
-  <section class="title">
-    <h1 class="clamp one">$title</h1>
-    <p class="subtitle clamp $layout">$subtitle</p>
-    <div class="meta"><span class="kicker"><i></i>$kicker</span><p class="clamp one">$meta</p></div>
-  </section>
-  <section class="timeline">$timeline</section>
-  <div class="columns $layout">$columns</div>
-  <section class="footer"><div class="legend">$legend</div><p>$footer</p></section>
-  <script>
-    // Drop the last highlights of a panel until the rest fit.
-    for (const list of document.querySelectorAll(".items"))
-      while (list.scrollHeight > list.clientHeight + 1 && list.children.length > 1) list.lastElementChild.remove();
-  </script>
+<div class="root">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs><filter id="halo" filterUnits="userSpaceOnUse" x="-12" y="-12" width="24" height="24"><feGaussianBlur stdDeviation="1.8"></feGaussianBlur></filter></defs>
+<symbol id="f2-fa" viewBox="-8 -8 16 16" style="overflow:visible" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle r="7" fill="currentColor" opacity=".7" filter="url(#halo)"></circle><circle r="5.6" fill="currentColor"></circle><circle r="3.4" style="fill:var(--warm)" opacity=".22"></circle><path d="M-2.3 -2.3L2.3 2.3M2.3 -2.3L-2.3 2.3" transform="scale(0.92)" stroke-width="1.85" style="stroke:var(--n0)"></path></symbol>
+<symbol id="f2-en" viewBox="-8 -8 16 16" style="overflow:visible" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle r="7" fill="currentColor" opacity=".7" filter="url(#halo)"></circle><circle r="5.6" fill="currentColor"></circle><circle r="3.4" style="fill:var(--warm)" opacity=".22"></circle><path d="M0 -3.1V0.6M0 2.7V2.8" transform="scale(0.92)" stroke-width="1.85" style="stroke:var(--n0)"></path></symbol>
+<symbol id="f2-re" viewBox="-8 -8 16 16" style="overflow:visible" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle r="7" fill="currentColor" opacity=".7" filter="url(#halo)"></circle><circle r="5.6" fill="currentColor"></circle><circle r="3.4" style="fill:var(--warm)" opacity=".22"></circle><path d="M-3 0.9C-2 -1.5 -0.9 -1.3 0 0S2 1.5 3 -0.9" transform="scale(0.92)" stroke-width="1.85" style="stroke:var(--n0)"></path></symbol>
+<symbol id="f2-ok" viewBox="-8 -8 16 16" style="overflow:visible" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle r="7" fill="currentColor" opacity=".7" filter="url(#halo)"></circle><circle r="5.6" fill="currentColor"></circle><circle r="3.4" style="fill:var(--warm)" opacity=".22"></circle><path d="M-2.8 0.1L-0.8 2.2L2.9 -2.1" transform="scale(0.92)" stroke-width="1.85" style="stroke:var(--n0)"></path></symbol>
+</svg>
+
+<div class="plate ab" data-block="plate">$plate<div class="p-edge"></div><div class="p-veil"></div><div class="p-side"></div></div>
+<div class="fault ab" data-block="fault"><i class="f-a"></i><i class="f-d"></i><i class="f-b"></i></div>
+<div class="sc ab" style="left:72px;top:50px">$kicker</div>
+$series
+<div class="logo ab" data-block="logo">$wordmark</div>
+<h1 class="ab">$name</h1>
+<div class="sub ab">$sub</div>
+
+<div class="hook" data-block="hook">
+<div class="big num">$wrong<span>$of $checked</span></div>
+<p>$hook</p>
+</div>
+<div class="bar" data-block="bar">$bar</div>
+<div class="legend">$legend</div>
+
+<div class="cols">
+<div data-block="severity"><div class="h2">$severity_head</div><div class="list">$severity</div></div>
+<div data-block="devices"><div class="h2">$devices_head</div><div class="list">$devices</div></div>
+</div>
+<div class="row dodged" data-block="dodged"><svg class="vi vc-re" width="30" height="30" aria-hidden="true"><use href="#f2-re"></use></svg><span>$dodged</span></div>
+
+<div class="gravest" data-block="gravest"><div class="h2">$gravest_head</div><div class="items">$gravest</div></div>
+
+<div class="foot ab" data-block="foot">$footer</div>
+</div>
 </body>
 </html>
