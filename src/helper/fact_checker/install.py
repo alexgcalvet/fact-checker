@@ -1,0 +1,237 @@
+"""`fact-checker setup`, `doctor` and `key set`: the tools the helper needs, the helper started at every login, and
+the keys."""
+import getpass
+import json
+import os
+import platform
+import plistlib
+import re
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from fact_checker.adapters import whisper
+from fact_checker.adapters.screenshot import find_chrome
+from fact_checker.adapters.llm_chat_api import needs_key
+from fact_checker.server import API, ROLES, WEB_SEARCH, provider, read_env, role, search_api, secret, speech_cli
+from fact_checker.store import default_home
+
+LABEL = "com.fact-checker.helper"
+UNIT = "fact-checker.service"
+HERE = Path(__file__).parent
+NO_AGENT_CLI = ("provider: no agent CLI logged in · fix: claude auth login (Claude subscription) or codex login "
+                "(ChatGPT subscription); to install one, see INSTALL-AGENT.md")
+
+
+@dataclass
+class Check:
+    name: str
+    state: str
+    fix: str = ""
+    ok: bool = True
+
+    def __str__(self) -> str:
+        return f"{self.name}: {self.state}" + (f" · fix: {self.fix}" if self.fix else "")
+
+
+def _tool(name: str, fix: str) -> Check:
+    return Check(name, "ok") if shutil.which(name) else Check(name, "missing", fix, ok=False)
+
+
+def _claude() -> Check:
+    if not shutil.which("claude"):
+        return Check("claude", "missing", "curl -fsSL https://claude.ai/install.sh | bash", ok=False)
+    status = subprocess.run(["claude", "auth", "status", "--json"], capture_output=True, text=True)
+    try:
+        logged_in = json.loads(status.stdout).get("loggedIn") is True
+    except json.JSONDecodeError:
+        logged_in = False
+    return Check("claude", "logged in") if logged_in else Check("claude", "not logged in", "claude auth login", ok=False)
+
+
+def _codex() -> Check:
+    codex = os.environ.get("CODEX_BIN", "codex")
+    if not shutil.which(codex):
+        return Check("codex", "missing", "install Codex CLI, or set CODEX_BIN", ok=False)
+    status = subprocess.run([codex, "login", "status"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    return Check("codex", "logged in") if status.returncode == 0 else Check("codex", "not logged in", "codex login", ok=False)
+
+
+def _llm(name: str) -> list[Check]:
+    """The command of a subscription provider; an API provider needs none."""
+    return {"claude": [_claude()], "codex": [_codex()]}.get(name, [])
+
+
+def _keys(home: Path) -> list[Check]:
+    """Each key that the roles need, once, by its variable name only: an API provider's key (none for a chat server
+    on this machine), and the search service's key for a search model with no web search."""
+    settings = [role(home, name) for name in ROLES]
+    variables = [s["key_env"] for s in settings
+                 if s["provider"] in API and (s["provider"] != "chat" or needs_key(s["base_url"]))]
+    if settings[ROLES.index("search")]["provider"] not in WEB_SEARCH:
+        variables.append(search_api(home)[0])
+    return [Check(v, "set") if secret(home, v) else Check(v, "missing", f"add {v}=<key> to {home / '.env'}", ok=False)
+            for v in dict.fromkeys(variables)]
+
+
+def tools(system: str, home: Path) -> list[Check]:
+    """The tools the helper needs: setup installs nothing while one is missing."""
+    mac = system == "Darwin"
+    return [
+        *[c for name in dict.fromkeys(role(home, r)["provider"] for r in ROLES) for c in _llm(name)],
+        _tool("uv", "curl -LsSf https://astral.sh/uv/install.sh | sh"),
+        _tool("yt-dlp", "uv tool install yt-dlp"),
+        _tool("ffmpeg", "brew install ffmpeg" if mac else "sudo apt install ffmpeg (or your distribution's package)"),
+        Check("chrome", "ok") if find_chrome(system) else
+        Check("chrome", "missing", "install Google Chrome" if mac else "install Google Chrome or Chromium", ok=False),
+    ]
+
+
+def _helper(port: int) -> Check:
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/videos/doctor", timeout=2)
+    except urllib.error.HTTPError:
+        pass  # any HTTP answer means the helper is there
+    except OSError:
+        return Check("helper", f"not running on port {port}", "fact-checker setup", ok=False)
+    return Check("helper", f"running on port {port}")
+
+
+def doctor(port: int, as_json: bool = False) -> int:
+    system = platform.system()
+    home = default_home()
+    env = read_env(home) | os.environ
+    engine = speech_cli()
+    roles = {name: role(home, name) for name in ROLES}
+    checks = [
+        Check("provider", provider(home)),
+        Check("models", ", ".join(f"{name} {r['model'] or 'account default'}" for name, r in roles.items())),
+        *[Check(f"role {name}", " · ".join(x for x in (r["provider"], r["model"] or "account default", r["base_url"]) if x))
+          for name, r in roles.items()],
+        *_keys(home),
+        *tools(system, home),
+        _helper(port),
+        Check("speech to text", ("mlx-whisper" if engine == whisper.CLI else "faster-whisper") if engine else "missing",
+              "" if engine else "install uv (see uv above)"),
+        Check("speaker separation", "on") if env.get("HF_TOKEN") else
+        Check("speaker separation", "off (optional)", f"add HF_TOKEN=<token> to {default_home() / '.env'}"),
+        Check("published fact-checks", "on") if env.get("FACT_CHECK_API_KEY") else
+        Check("published fact-checks", "off (optional)", f"add FACT_CHECK_API_KEY=<key> to {default_home() / '.env'}"),
+    ]
+    ok = all(c.ok for c in checks)
+    if as_json:
+        print(json.dumps({"ok": ok, "checks": [asdict(c) for c in checks]}, ensure_ascii=False, indent=1))
+        return 0 if ok else 1
+    for check in checks:
+        print(check)
+    if provider(home) == "codex":
+        print("Run `codex debug models` to see the models your plan allows.")
+    return 0 if ok else 1
+
+
+def launchd_plist(command: list[str], path: str, log: Path) -> bytes:
+    return plistlib.dumps({"Label": LABEL, "ProgramArguments": command, "RunAtLoad": True, "KeepAlive": True,
+                           "EnvironmentVariables": {"PATH": path},
+                           "StandardOutPath": str(log), "StandardErrorPath": str(log)})
+
+
+def systemd_unit(command: list[str], path: str) -> str:
+    return (f"[Unit]\nDescription=fact-checker helper\n\n"
+            f"[Service]\nExecStart={' '.join(command)}\nEnvironment=PATH={path}\nRestart=on-failure\n\n"
+            f"[Install]\nWantedBy=default.target\n")
+
+
+def logged_in_cli() -> str | None:
+    """The first agent CLI that is logged in: Claude Code, then Codex."""
+    return next((name for name, check in (("claude", _claude), ("codex", _codex)) if check().ok), None)
+
+
+def settings_files(home: Path, provider: str | None) -> None:
+    """Writes a settings file that names the provider, from the commented example, and copies the commented keys
+    file; an existing file stays."""
+    home.mkdir(parents=True, exist_ok=True)
+    config, keys = home / "config.toml", home / ".env"
+    if provider and not config.exists():
+        example = (HERE / "config.example.toml").read_text()
+        config.write_text(example.replace('# provider = "claude"', f'provider = "{provider}"', 1))
+        print(f"settings: {config} (provider {provider}; edit it to change provider or models)")
+    if not keys.exists():
+        shutil.copy(HERE / "env.example", keys)
+        print(f"keys: {keys} (add a key with fact-checker key set <NAME>)")
+
+
+def set_key(home: Path, name: str) -> int:
+    """Reads a key with a hidden prompt and writes `<name>=<key>` into `<home>/.env`, in place of the line of that
+    name, commented or not; the file is readable only by the person."""
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+        print(f"key: {name} is not a variable name, such as HF_TOKEN")
+        return 1
+    value = getpass.getpass(f"{name} (what you type stays hidden): ").strip()
+    if not value:
+        print("key: nothing typed, nothing saved")
+        return 1
+    home.mkdir(parents=True, exist_ok=True)
+    path = home / ".env"
+    lines = path.read_text().splitlines() if path.exists() else []
+    same = [i for i, line in enumerate(lines) if re.match(rf"#?\s*{name}\s*=", line)]
+    line = f"{name}={value}"
+    lines = [line if i == same[0] else x for i, x in enumerate(lines)
+             if i not in same[1:] or x.lstrip().startswith("#")] if same else [*lines, line]
+    path.touch(mode=0o600)
+    path.chmod(0o600)
+    path.write_text("\n".join(lines) + "\n")
+    print(f"{name}: saved in {path}. Run fact-checker setup to restart the helper with it.")
+    return 0
+
+
+def extension(home: Path) -> Path:
+    """Copies the built extension of the package to `<home>/extension`, the folder that Chrome loads."""
+    target = home / "extension"
+    shutil.rmtree(target, ignore_errors=True)
+    shutil.copytree(HERE / "extension", target)
+    return target
+
+
+def setup(port: int) -> int:
+    """Checks the tools, then installs the helper as a launchd agent (macOS) or a systemd user service (Linux)."""
+    system = platform.system()
+    home = default_home()
+    found = None if (home / "config.toml").exists() else logged_in_cli()
+    if not found and not (home / "config.toml").exists():
+        print(NO_AGENT_CLI)
+        return 1
+    settings_files(home, found)
+    missing = [c for c in tools(system, home) if not c.ok]
+    if missing:
+        for check in missing:
+            print(check)
+        return 1
+    folder = extension(home)
+    # An autostarted helper gets a bare PATH: it keeps the one of this shell, where every tool was found.
+    command, path = [sys.executable, "-m", "fact_checker.cli", "serve", "--port", str(port)], os.environ["PATH"]
+    if system == "Darwin":
+        agent = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
+        agent.parent.mkdir(parents=True, exist_ok=True)
+        default_home().mkdir(parents=True, exist_ok=True)
+        agent.write_bytes(launchd_plist(command, path, default_home() / "server.log"))
+        domain = f"gui/{os.getuid()}"
+        subprocess.run(["launchctl", "bootout", f"{domain}/{LABEL}"], capture_output=True)
+        subprocess.run(["launchctl", "bootstrap", domain, str(agent)], check=True)
+        print(f"helper: starts at login ({agent})")
+    elif system == "Linux":
+        unit = Path.home() / ".config" / "systemd" / "user" / UNIT
+        unit.parent.mkdir(parents=True, exist_ok=True)
+        unit.write_text(systemd_unit(command, path))
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+        subprocess.run(["systemctl", "--user", "enable", "--now", UNIT], check=True)
+        print(f"helper: starts at login ({unit})")
+    else:
+        print(f"helper: no autostart on {system} · fix: run fact-checker serve by hand")
+        return 1
+    print(f"next: load {folder} in Chrome (chrome://extensions → Developer mode → Load unpacked), "
+          "then run fact-checker doctor")
+    return 0

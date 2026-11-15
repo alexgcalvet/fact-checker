@@ -1,0 +1,264 @@
+{
+ "wireMagic": "pb3",
+ "pens": [
+  {}
+ ],
+ "wsWinStyles": [
+  {}
+ ],
+ "wpWinPositions": [
+  {}
+ ],
+ "events": [
+  {
+   "tStartMs": 0,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "bienvenidos"
+    },
+    {
+     "utf8": " a",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " entrevista",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " hoy",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 10000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "el"
+    },
+    {
+     "utf8": " paro",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " juvenil",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " se",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " duplicó",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " el",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " año",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " pasado",
+     "tOffsetMs": 2800
+    }
+   ]
+  },
+  {
+   "tStartMs": 16000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "eso"
+    },
+    {
+     "utf8": " es",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " lo",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " que",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " dicen",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " los",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " datos",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 40000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "españa"
+    },
+    {
+     "utf8": " tiene",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " cuarenta",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " y",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " ocho",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " millones",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " habitantes",
+     "tOffsetMs": 2800
+    }
+   ]
+  },
+  {
+   "tStartMs": 70000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "la"
+    },
+    {
+     "utf8": " inflación",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " septiembre",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " fue",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " del",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " cinco",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " por",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " ciento",
+     "tOffsetMs": 3200
+    }
+   ]
+  },
+  {
+   "tStartMs": 100000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "el"
+    },
+    {
+     "utf8": " paro",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " bajó",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " al",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " ocho",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " por",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " ciento",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " en",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " el",
+     "tOffsetMs": 3200
+    },
+    {
+     "utf8": " tercer",
+     "tOffsetMs": 3600
+    },
+    {
+     "utf8": " trimestre",
+     "tOffsetMs": 4000
+    }
+   ]
+  },
+  {
+   "tStartMs": 110000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "gracias"
+    },
+    {
+     "utf8": " por",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " venir",
+     "tOffsetMs": 800
+    }
+   ]
+  }
+ ]
+}

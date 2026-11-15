@@ -1,0 +1,17 @@
+{
+ "query": "tasa de paro",
+ "results": [
+  {
+   "title": "Encuesta de Población Activa",
+   "url": "https://www.ine.es/paro",
+   "content": "La tasa de paro se sitúa en el 11 %.",
+   "score": 0.81,
+   "published_date": "2026-10-01"
+  }
+ ],
+ "response_time": 1.09,
+ "usage": {
+  "credits": 1
+ },
+ "request_id": "123e4567-e89b-12d3-a456-426614174111"
+}

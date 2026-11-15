@@ -1,0 +1,8 @@
+{
+  "extraKnownMarketplaces": {
+    "mini-spec-template": { "source": { "source": "github", "repo": "alexgcalvet/mini-spec-template" },
+                            "autoUpdate": true }
+  },
+  "enabledPlugins": { "mini-spec@mini-spec-template": true },
+  "statusLine": { "type": "command", "command": "bash \"$HOME/.claude/plugins/data/mini-spec-mini-spec-template/statusline.sh\"" }
+}

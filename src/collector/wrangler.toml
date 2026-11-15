@@ -1,0 +1,9 @@
+name = "fact-checker-feedback"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+# Put the id that `npx wrangler d1 create fact-checker-feedback` prints. See README.md.
+[[d1_databases]]
+binding = "DB"
+database_name = "fact-checker-feedback"
+database_id = "fb67f631-7d4c-4bc3-be16-2f1f4ac7b665"

@@ -1,0 +1,3 @@
+A1 e4bc3ce1ce160d94ffacd1838fbab2a16f18884b72aecefa5a61b24ee471fc4e tests/acceptance/test_s9_a1_record_contradiction.py
+A2 d51f46b178ab912266ec5e7d12e46ddbc494dd1029d512ac611e0d3222aa1f75 tests/acceptance/test_s9_a2_promise_status.py
+A3 8f39959d64509b6051e744a12d70f241419c553436e36f29fb676fd16813f33b tests/acceptance/s9-a3-record-card.test.ts

@@ -1,0 +1,4 @@
+# Files that search tools skip. Agents still read any file by its path.
+# The archive is read through docs/archive/README.md. The pages are generated.
+docs/archive/
+docs/**/*.html

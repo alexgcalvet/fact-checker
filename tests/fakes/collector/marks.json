@@ -1,0 +1,23 @@
+{
+  "post": {"stored": 1},
+  "get": {
+    "rows": [
+      {
+        "install_id": "11111111-1111-4111-8111-111111111111",
+        "helper_version": "0.1.0",
+        "received_at": "2026-11-15T10:00:00.000Z",
+        "video_id": "abcdefgh",
+        "flag_id": "ad_hominem-42.0",
+        "t": 42.0,
+        "type": "fallacy",
+        "label": "ad_hominem",
+        "quote": "frase inventada",
+        "confidence": 0.85,
+        "verdict": "unfair",
+        "reason": "",
+        "provider": "claude",
+        "model": "opus"
+      }
+    ]
+  }
+}

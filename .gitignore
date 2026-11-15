@@ -1,0 +1,20 @@
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets: never commit them
+.env
+.env.*
+
+# Build output of common languages
+__pycache__/
+*.pyc
+node_modules/
+dist/
+# The built extension that the helper package ships (S25)
+!src/helper/fact_checker/extension/dist/
+build/
+
+# Personal Claude Code settings, such as your own status line
+.claude/settings.local.json

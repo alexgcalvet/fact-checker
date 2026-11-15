@@ -1,0 +1,8 @@
+/* Host Grotesk ships with the extension (SIL Open Font License, see OFL.txt), so the overlay looks the same on
+   any computer. */
+@font-face {
+  font-family: "Host Grotesk";
+  src: url("chrome-extension://__MSG_@@extension_id__/fonts/HostGrotesk-Variable.ttf") format("truetype");
+  font-weight: 300 700;
+  font-display: swap;
+}

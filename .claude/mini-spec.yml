@@ -1,0 +1,44 @@
+# Settings of the mini-spec skills. Rules live in CLAUDE.md.
+# Only the skill that needs a key reads this file. A missing key uses the default shown here.
+
+# on | off. off: /mini-spec and /mini-implement never write docs/specs/index.html.
+spec_page: off
+
+# inherit | sonnet | opus | haiku | fable. The model of the /mini-review agent. --model overrides it.
+review_model: inherit
+
+# on | off. on: /mini-implement runs a range or a whole spec in a subagent, and the chat gets only its report.
+implement_in_subagent: on
+
+# inherit | sonnet | opus | haiku | fable. The model of the /mini-implement agent.
+# --model overrides it, and also makes that run use a subagent.
+implement_model: inherit
+
+# person | agent. The default of the Approval line that /mini-spec writes in a slice.
+# person: /mini-implement stops after the red tests until the person runs it with approve.
+# agent: /mini-implement approves its own tests and builds to green. Use it only for low-risk work.
+approval: agent
+
+# A folder. The acceptance lock hook asks the person before a change to an existing file here.
+acceptance_dir: tests/acceptance
+
+# The command that /mini-implement runs before it proposes commits.
+verify: (cd src/helper && uvx --quiet pytest -c pyproject.toml -q) && (cd src/extension && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run)
+
+
+# The segments that .claude/statusline.sh shows, in a list. on shows all of them, off hides the status line.
+# Segments: model, context, tokens, cost, branch, changes (uncommitted files and lines, and those outside the open slice),
+# stale (commits since the explore page was generated), progress (RFC and open spec), next (command), clear (the /clear hint),
+# now (the skill, phase and last tool call of the main agent), agents (the last tool call of each background agent).
+# To use your own status line, set statusLine in .claude/settings.local.json.
+statusline: [model, context, tokens, cost, branch, changes, stale, progress, next, clear, now, agents]
+
+# A percentage. From this context use, the status line shows "/clear after": clear when the current step ends.
+clear_hint_at: 40
+
+# Written by /mini-ticket on its first run.
+# tracker:
+#   project: KEY
+#   types: { epic: Epic, story: Story }
+#   required_fields: []
+#   states: { start: In Progress, review: In Review, done: Done }

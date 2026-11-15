@@ -1,0 +1,19 @@
+[project]
+name = "fact-checker"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[project.scripts]
+fact-checker = "fact_checker.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["../../tests"]
+pythonpath = ["."]
+
+[tool.hatch.build]
+# The built extension: its dist/ matches the repo's ignore rule for build output, which hatch also reads.
+artifacts = ["fact_checker/extension/dist/"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

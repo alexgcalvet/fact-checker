@@ -1,0 +1,1082 @@
+{
+ "wireMagic": "pb3",
+ "pens": [
+  {}
+ ],
+ "wsWinStyles": [
+  {}
+ ],
+ "wpWinPositions": [
+  {}
+ ],
+ "events": [
+  {
+   "tStartMs": 0,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "buenas"
+    },
+    {
+     "utf8": " noches",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " y",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " bienvenidos",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " al",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " programa",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 3900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 4000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "hoy"
+    },
+    {
+     "utf8": " hablamos",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " vivienda",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " con",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " ministra",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 7900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 9000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "ministra"
+    },
+    {
+     "utf8": " los",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " alquileres",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " han",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " subido",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " un",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " veinte",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " por",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " ciento",
+     "tOffsetMs": 3200
+    }
+   ]
+  },
+  {
+   "tStartMs": 12900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 15000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "qué"
+    },
+    {
+     "utf8": " va",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " a",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " hacer",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " su",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " gobierno",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 18900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 19000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "mire"
+    },
+    {
+     "utf8": " estamos",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " trabajando",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " en",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " una",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " ley",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " ambiciosa",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 22900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 26000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "que"
+    },
+    {
+     "utf8": " va",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " a",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " cambiar",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " las",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " cosas",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " verdad",
+     "tOffsetMs": 2800
+    }
+   ]
+  },
+  {
+   "tStartMs": 29900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 35000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "pero"
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " oposición",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " dice",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " que",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " ley",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " no",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " funcionará",
+     "tOffsetMs": 3200
+    }
+   ]
+  },
+  {
+   "tStartMs": 38900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 42000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "la"
+    },
+    {
+     "utf8": " oposición",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " no",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " tiene",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " autoridad",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " para",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " hablar",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 45900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 47000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "su"
+    },
+    {
+     "utf8": " portavoz",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " está",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " imputado",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " por",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " corrupción",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 50900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 55000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "eso"
+    },
+    {
+     "utf8": " no",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " responde",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " a",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " crítica",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " sobre",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " ley",
+     "tOffsetMs": 3200
+    }
+   ]
+  },
+  {
+   "tStartMs": 58900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 62000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "ustedes"
+    },
+    {
+     "utf8": " cuando",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " gobernaron",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " subieron",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " más",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " los",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " alquileres",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 65900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 70000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "así"
+    },
+    {
+     "utf8": " que",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " no",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " nos",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " den",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " lecciones",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 73900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 80000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "hablemos"
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " oferta",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " vivienda",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " pública",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 83900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 88000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "cuántas"
+    },
+    {
+     "utf8": " viviendas",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " se",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " construirán",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " este",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " año",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 91900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 95000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "estamos"
+    },
+    {
+     "utf8": " en",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " conversaciones",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " con",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " las",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " comunidades",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 98900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 110000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "es"
+    },
+    {
+     "utf8": " una",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " situación",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " que",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " nos",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " preocupa",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " a",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " todos",
+     "tOffsetMs": 2800
+    }
+   ]
+  },
+  {
+   "tStartMs": 113900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 125000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "piense"
+    },
+    {
+     "utf8": " en",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " las",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " familias",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " que",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " lo",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " están",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " pasando",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " mal",
+     "tOffsetMs": 3200
+    }
+   ]
+  },
+  {
+   "tStartMs": 128900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 160000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "algunos"
+    },
+    {
+     "utf8": " proponen",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " bajar",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " impuestos",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " a",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " los",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " propietarios",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 163900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 168000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "o"
+    },
+    {
+     "utf8": " aprobamos",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " nuestra",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " ley",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " o",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " los",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " alquileres",
+     "tOffsetMs": 2400
+    },
+    {
+     "utf8": " seguirán",
+     "tOffsetMs": 2800
+    },
+    {
+     "utf8": " subiendo",
+     "tOffsetMs": 3200
+    }
+   ]
+  },
+  {
+   "tStartMs": 171900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 176000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "no"
+    },
+    {
+     "utf8": " hay",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " otra",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " opción",
+     "tOffsetMs": 1200
+    }
+   ]
+  },
+  {
+   "tStartMs": 179900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 190000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "gracias"
+    },
+    {
+     "utf8": " ministra",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " por",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " su",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " tiempo",
+     "tOffsetMs": 1600
+    }
+   ]
+  },
+  {
+   "tStartMs": 193900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 200000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "a"
+    },
+    {
+     "utf8": " ustedes",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " buenas",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " noches",
+     "tOffsetMs": 1200
+    }
+   ]
+  },
+  {
+   "tStartMs": 203900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 215000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "y"
+    },
+    {
+     "utf8": " hasta",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " aquí",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " el",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " programa",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " de",
+     "tOffsetMs": 2000
+    },
+    {
+     "utf8": " hoy",
+     "tOffsetMs": 2400
+    }
+   ]
+  },
+  {
+   "tStartMs": 218900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 232000,
+   "dDurationMs": 4000,
+   "wWinId": 1,
+   "segs": [
+    {
+     "utf8": "nos"
+    },
+    {
+     "utf8": " vemos",
+     "tOffsetMs": 400
+    },
+    {
+     "utf8": " la",
+     "tOffsetMs": 800
+    },
+    {
+     "utf8": " semana",
+     "tOffsetMs": 1200
+    },
+    {
+     "utf8": " que",
+     "tOffsetMs": 1600
+    },
+    {
+     "utf8": " viene",
+     "tOffsetMs": 2000
+    }
+   ]
+  },
+  {
+   "tStartMs": 235900,
+   "dDurationMs": 100,
+   "wWinId": 1,
+   "aAppend": 1,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  }
+ ]
+}

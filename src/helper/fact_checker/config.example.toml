@@ -1,0 +1,43 @@
+# fact-checker settings. `fact-checker setup` copies this file to ~/.fact-checker/config.toml.
+# Every line is optional: with every line commented out, the helper reads with Claude Code on your Claude
+# subscription (opus for parts, verdicts and the judge; haiku for the web search and the screen).
+# After a change, run `fact-checker setup` to restart the helper, then `fact-checker doctor` to check it.
+
+# Who reads the video: claude | codex | anthropic | openai | chat
+# provider = "claude"
+
+# Where each mark goes a moment after you give it, if you agreed: the author's collector. Keep these lines above
+# every [table]. Without feedback_url, nothing is sent. `fact-checker feedback send` sends your pending marks now, or writes them
+# to ~/.fact-checker/feedback-<date>.json for you to send by hand.
+feedback_url = "https://fact-checker-feedback.alexgcalvet7.workers.dev"
+# Your answer to "share your marks and analyses with the author?": the extension asks once and writes this line,
+# and the ⚙ box of the side panel changes it. Until it is written, nothing is shared. See PRIVACY.md.
+# share_marks = true
+# false: every part gets the full reading, with no cheap screen first. Only to measure what the screen drops.
+# screen = false
+
+# The model of each step. A missing step takes the provider's default.
+# [models]
+# parts = "opus"        # reads each part of the video: most of the cost
+# verdict = "opus"      # turns the search evidence into verdicts
+# judge = "opus"        # the whole-video judge pass
+# search = "haiku"      # web search for figures
+# screen = "haiku"      # decides which parts get the full reading (chat: the parts model)
+
+# An OpenAI-compatible Responses API other than OpenAI, such as xAI Grok.
+# [openai]
+# base_url = "https://api.x.ai/v1"
+# key_env = "XAI_API_KEY"
+
+# Any Chat Completions API: Hugging Face, OpenRouter, Groq, Together, DeepSeek, Mistral, or a local Ollama.
+# Such a model has no web search: figures are searched with Tavily (TAVILY_API_KEY in .env).
+# [chat]
+# base_url = "https://router.huggingface.co/v1"   # default: http://localhost:11434/v1 (Ollama, no key)
+# key_env = "HF_TOKEN"
+
+# One step on its own provider: a cheap model reads the parts, the default provider does the rest.
+# [roles.parts]
+# provider = "chat"
+# base_url = "https://router.huggingface.co/v1"
+# key_env = "HF_TOKEN"
+# model = "<a model id>"

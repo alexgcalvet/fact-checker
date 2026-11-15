@@ -1,0 +1,95 @@
+{
+ "claims": [
+  {
+   "text": "“¿Quién ha hecho que, ahora sí, tengamos trabajo y haya el menor paro juvenil de la historia de España? El Partido Socialista”",
+   "claimant": "(secret removed)",
+   "claimDate": "2026-07-06T00:00:00Z",
+   "claimReview": [
+    {
+     "publisher": {
+      "name": "Newtral",
+      "site": "newtral.es"
+     },
+     "url": "https://www.newtral.es/paro-juvenil-espana-diana-morant-factcheck/20260612/",
+     "title": "Diana Morant y los datos de paro juvenil en España",
+     "reviewDate": "2026-06-12T00:00:00Z",
+     "textualRating": "Verdad a medias",
+     "languageCode": "es"
+    }
+   ]
+  },
+  {
+   "text": "“Tenemos la tasa de paro juvenil más baja de la historia”",
+   "claimant": "(secret removed)",
+   "claimDate": "2025-05-25T00:00:00Z",
+   "claimReview": [
+    {
+     "publisher": {
+      "name": "Newtral",
+      "site": "newtral.es"
+     },
+     "url": "https://www.newtral.es/tasa-desempleo-juvenil-espana-factcheck/20250527/",
+     "title": "La tasa de desempleo juvenil más baja de España fue en 2006",
+     "reviewDate": "2025-05-27T00:00:00Z",
+     "textualRating": "Falso",
+     "languageCode": "es"
+    }
+   ]
+  },
+  {
+   "text": "“Estamos con la tasa de paro juvenil más baja de la serie histórica; tenemos tan solo 185.000 jóvenes en desempleo”",
+   "claimant": "(secret removed)",
+   "claimDate": "2025-03-01T00:00:00Z",
+   "claimReview": [
+    {
+     "publisher": {
+      "name": "Newtral",
+      "site": "newtral.es"
+     },
+     "url": "https://www.newtral.es/tasa-paro-juvenil-factcheck/20250107/",
+     "title": "FACT-CHECK: España tiene la cifra más baja de jóvenes ...",
+     "reviewDate": "2025-01-07T00:00:00Z",
+     "textualRating": "Engañoso",
+     "languageCode": "es"
+    }
+   ]
+  },
+  {
+   "text": "“Hoy tenemos más jóvenes en paro de los que teníamos antes de la pandemia”",
+   "claimant": "(secret removed)",
+   "claimDate": "2024-12-15T00:00:00Z",
+   "claimReview": [
+    {
+     "publisher": {
+      "name": "Newtral",
+      "site": "newtral.es"
+     },
+     "url": "https://www.newtral.es/numero-jovenes-paro-factcheck/20241217/",
+     "title": "La tasa de paro en jóvenes baja desde prepandemia",
+     "reviewDate": "2024-12-17T00:00:00Z",
+     "textualRating": "Engañoso",
+     "languageCode": "es"
+    }
+   ]
+  },
+  {
+   "text": "“La tasa de desempleo juvenil ha caído drásticamente. Estamos en los mejores datos de nuestra historia”",
+   "claimant": "(secret removed)",
+   "claimDate": "2024-05-22T00:00:00Z",
+   "claimReview": [
+    {
+     "publisher": {
+      "name": "Newtral",
+      "site": "newtral.es"
+     },
+     "url": "https://www.newtral.es/tasa-paro-juvenil-2024-teresa-ribera-factcheck/20240525/",
+     "title": "Los datos de paro juvenil no son “los mejores de nuestra historia”, pese a lo que dice Ribera",
+     "reviewDate": "2024-05-25T00:00:00Z",
+     "textualRating": "Falso",
+     "languageCode": "es"
+    }
+   ]
+  }
+ ],
+ "nextPageToken": "CAU"
+}

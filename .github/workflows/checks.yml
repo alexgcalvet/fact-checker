@@ -1,0 +1,22 @@
+name: checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  helper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: cd src/helper && uvx --quiet pytest -c pyproject.toml -q
+  extension-and-collector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd src/extension && npm ci && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run && npm run build
+      - name: The shipped extension matches a fresh build
+        run: git diff --exit-code -- src/helper/fact_checker/extension

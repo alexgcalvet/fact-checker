@@ -1,0 +1,27 @@
+{
+ "id": "chatcmpl-B9MHDbslfkBeAs8l4bebGdFOJ6PeG",
+ "object": "chat.completion",
+ "created": 1741570283,
+ "model": "openai/gpt-oss-120b",
+ "choices": [
+  {
+   "index": 0,
+   "message": {
+    "role": "assistant",
+    "content": "{\"ok\":true}",
+    "refusal": null,
+    "annotations": []
+   },
+   "logprobs": null,
+   "finish_reason": "stop"
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 4000,
+  "completion_tokens": 500,
+  "total_tokens": 4500,
+  "prompt_tokens_details": {
+   "cached_tokens": 3000
+  }
+ }
+}
