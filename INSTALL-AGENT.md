@@ -7,7 +7,9 @@ fact-checker is a Chrome extension and a small helper program. The helper reads 
 ## Rules
 
 - Speak to the person in their language. Use the **ES** text for Spanish and the **EN** text for English.
-- Do every step yourself. Ask the person only when a step shows a message for the person.
+- Do every step yourself. Run every command yourself. Ask the person only when a step shows a message for the person.
+- If a command fails with "Operation not permitted", your sandbox blocked it. Ask the person to approve the command. Then run the same command again outside your sandbox.
+- Never run `fact-checker serve`. `fact-checker setup` starts the helper at every login.
 - Never ask the person to paste a key, a token or a password into the chat.
 - A key goes in only through `fact-checker key set <NAME>`. The person runs it in their own terminal.
 - Never read, print or edit `~/.fact-checker/.env`.
@@ -66,16 +68,23 @@ Before you run `claude auth login` or `codex login`, tell the person this messag
 
 The installer installs uv, yt-dlp, ffmpeg and the helper. Then it starts the helper at every login. It is safe to run again.
 
+Name yourself with `--provider`: the helper reads with the subscription of the agent that installs it.
+
+- If you are Codex, use `--provider codex`.
+- If you are Claude Code or the Claude app, use `--provider claude`.
+
+The commands below show Codex. Change the last word if you are Claude.
+
 - If you are in a folder of the fact-checker repository, run the installer from there.
 
 ```sh
-./install.sh
+./install.sh --provider codex
 ```
 
 - If not, download and run it.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/alexgcalvet/fact-checker/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alexgcalvet/fact-checker/main/install.sh | sh -s -- --provider codex
 ```
 
 The last line of the output names the extension folder, such as `/Users/ana/.fact-checker/extension`. Keep this path for step 5.
@@ -95,7 +104,8 @@ The output is one JSON object. `"ok"` is `true` when everything works. Each item
 |---|---|
 | `claude` or `codex` | Go to step 2 |
 | `chrome` | Tell the person the Chrome message below. Then run `fact-checker setup` |
-| `helper` | Run `fact-checker setup` |
+| `helper`, with the state `blocked by the agent's sandbox` | Ask the person to approve. Then run `fact-checker setup` and `fact-checker doctor --json` outside your sandbox |
+| `helper`, with any other state | Run `fact-checker setup` |
 | A variable name, such as `ANTHROPIC_API_KEY` | Tell the person the key message below, with that name |
 | Any other check | Run the command in its `fix` |
 
@@ -124,6 +134,7 @@ Tell the person this message.
 ## Repair and update
 
 - If the player says that the helper does not answer, run `fact-checker doctor --json`. Then follow step 4.
+- If the person asks to read with the other subscription, run `fact-checker provider codex` or `fact-checker provider claude`. It restarts the helper.
 - To update from a clone, run these commands in the repository folder.
 
 ```sh

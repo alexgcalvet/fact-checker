@@ -1,7 +1,7 @@
 # Architecture
 
-**RFC**: [RFC.md](RFC.md) · **Target**: [TARGET.md](TARGET.md) · **Synced**: 2026-11-15 · `398b042`
-**Pending changes**: 23 new · 10 changed (S5–S20)
+**RFC**: [RFC.md](RFC.md) · **Target**: [TARGET.md](TARGET.md) · **Synced**: 2026-11-15 · `cb2e89f`
+**Pending changes**: 28 new · 15 changed (S5–S37)
 
 Marks: `🟢 **NEW · S5**` and `🟡 **CHANGED · S5**` at the start of a row show what a spec proposes. A row without a mark describes the code today. `/rfc sync` removes the marks of a spec when it is done.
 
@@ -24,10 +24,10 @@ A Chrome extension shows flags on the YouTube player. A Python helper on the per
 | Screen | A cheap reading that says whether a part gets the full reading | `src/helper/fact_checker/core/pipeline.py` (`screen`) | none |
 | Judge | One reading of the whole transcript that rules on every non-context flag before the file says done | `src/helper/fact_checker/core/judge.py` | none |
 | Search adapter | Web search results for a search role with no web search of its own (Tavily) | `src/helper/fact_checker/adapters/search_tavily.py` | none |
-| Summary | Picks each speaker's most serious reviewed flags and renders the shareable image and its alt text | `src/helper/fact_checker/core/summary.py`, `summary.html`, `adapters/screenshot.py`, `adapters/thumbnail.py` | `~/.fact-checker/thumbnails/` |
+| 🟡 **CHANGED · S35 S36** Summary | Builds the profile card of each guest of a video and the comparison card of up to three people, and renders each as a PNG with its alt text | `src/helper/fact_checker/core/summary.py`, `summary.html`, `adapters/screenshot.py`, `adapters/thumbnail.py`, `cli.py` | `~/.fact-checker/thumbnails/` |
 | Feedback | Sends each mark to the collector after consent; keeps the sent record and the install id; `feedback send` and `feedback pull` | `src/helper/fact_checker/feedback.py` | `~/.fact-checker/install-id`, `feedback-sent.json`, `feedback/` |
 | Shared analyses | Uploads a whole analysis stripped to the shared fields; downloads an approved one; the owner's list, approve and reject | `src/helper/fact_checker/analyses.py` | none |
-| Install | `setup`, `doctor`, `key set`: checks the tools, writes `config.toml` and `.env`, copies the extension, starts the helper at login | `src/helper/fact_checker/install.py`, `install.sh`, `INSTALL-AGENT.md` | `~/.fact-checker/config.toml`, `.env`, `extension/` |
+| Install | `setup`, `doctor`, `key set`, `provider`: checks the tools, writes `config.toml` and `.env`, copies the extension, starts the helper at login, switches the provider | `src/helper/fact_checker/install.py`, `install.sh`, `INSTALL-AGENT.md` | `~/.fact-checker/config.toml`, `.env`, `extension/` |
 | Collector | Cloudflare Worker: keeps testers' marks and shared analyses, serves only approved analyses, hard stops per tester | `src/collector/` | D1 database `fact-checker-feedback` (`schema.sql`) |
 
 - The helper home is `~/.fact-checker/`, or the folder in `FACT_CHECKER_HOME` (tests use a temporary one). It holds `videos/`, `captions/`, `thumbnails/`, the logs, `marks.jsonl`, `config.toml`, `.env` (keys, mode 600), `extension/`, `install-id`, `feedback-sent.json` and `feedback/`.
@@ -135,10 +135,11 @@ flowchart LR
 | `promise` | contradiction `promise` only: `{made, figure, deadline, status}`; `made` is `YYYY-MM`, `status` is `met`, `partly met`, `not met` or `in progress`; only `partly met` and `not met` make a flag |
 | `note` | inaccuracy: the updated value when the data changed after `published_at` |
 | `on_player` | `true` when the confidence reaches the bar of the flag's type |
-| `judge` | non-context flags, once every part is done and before `status` says `done` (on in the helper and in `fact-checker judge <id>`, off by default in `run_analysis`): `{verdict: keep\|nitpick\|drop, reason, speaker?}` from one Opus reading per started 2 video-hours of the whole transcript with speakers. 🟡 **CHANGED · S32** The judge rules only `keep` or `nitpick` (a "puntualización", for a small slip of any flag type), and any other answer is `keep`; `drop` remains only in files judged before S32. `speaker` only when the line belongs to someone else. The found flag stays, so the judge is reversible. Absent when the judge fails. A `mark` wins: a flag marked `correct` shows as found, under the judge's speaker |
+| `judge` | non-context flags, once every part is done and before `status` says `done` (on in the helper and in `fact-checker judge <id>`, off by default in `run_analysis`): `{verdict: keep\|nitpick\|drop, reason, speaker?}` from one Opus reading per started 2 video-hours of the whole transcript with speakers. 🟡 **CHANGED · S32** The judge rules only `keep` or `nitpick` (a "puntualización", for a small slip of any flag type), and any other answer is `keep`; `drop` remains only in files judged before S32. `speaker` only when the line belongs to someone else. The found flag stays, so the judge is reversible. Absent when the judge fails. A `mark` wins: a flag marked `correct` shows as found, under the judge's speaker The verdict carries `severity?`: `minor`, `moderate` or `serious` by a published rubric (materiality, centrality, magnitude; never intent), only on a `keep`; a file judged before S34 has none |
 | `first_flags_s` | seconds from the start of the analysis to the first chunk written; absent until then; not in a shared copy |
 | `source` | `shared` when the file came from the author's collector (another person's whole analysis in the viewer's language); absent for an analysis made here |
 | `speakers` | the name of each voice of the transcript |
+| `people` | per speaker name `{role: host\|guest, person, spoken_s, set_by: llm\|person}`: `person` is the canonical name that matches one person across videos; `spoken_s` the seconds of speech |
 | `readers` | the provider and model of each role that read the video, `{parts: {provider, model}, …}`; absent in older files |
 | `mark` | on `GET` only, never in the file: the person's latest verdict on the flag, `correct` or `unfair`; absent with no mark |
 
@@ -149,12 +150,14 @@ flowchart LR
 | `POST /videos/<id>?from=<seconds>&lang=<es\|en>` | Start an analysis at the playback second if no flag file exists; `lang`, the extension's interface language, goes into the flag file (any other value: 400) |
 | 🟡 **CHANGED · S18** `GET /videos/<id>?at=<seconds>` | Return the flag file so far, each flag with its latest `mark` from `marks.jsonl`. 🟢 S18: `at`, the playback second, moves and resumes a running analysis; the extension sends it on every poll. With `lang` and no local file, the helper first asks the collector `GET /analyses/<id>?lang=` (no install id, 5 s) and keeps what it gets with `source: "shared"`; else 404 |
 | `POST /videos/<id>/marks` | Keep the person's mark on one flag: `{flag_id, verdict: correct\|unfair, reason}`; with sharing on, the helper sends it to the collector in the background |
-| `GET /videos/<id>/summary.png` | The shareable image: 1080×1350, only flags marked `correct`, rendered by headless Chrome. An infographic: video thumbnail hero, a timeline per speaker, one donut by flag type and a list of the most serious quotes with their reference per speaker (as many as fit); all text ≥ 26 px |
+| `POST /videos/<id>/people` | The person sets the role of one speaker: `{name, role}`; `set_by` becomes `person` |
+| 🟡 **CHANGED · S35** `GET /videos/<id>/summary.png?person=<name>` | The profile card of one guest: 1080×1350, only flags marked `correct`, rendered by headless Chrome in the layout of the CALVET board `InterviewCard`; all text ≥ 30 px |
 | `GET /videos/<id>/summary.txt` | The alt text of the image, at most 1000 characters |
 | `GET /videos/<id>/summary` | A page with the image and its alt text ready to copy; the extension opens it in a new tab |
 | `GET /share` | The sharing answer: `{share: true\|false\|null}`; null until the person answers |
 | `POST /share` | `{share: bool}`: writes `share_marks` into `config.toml` (any other body: 400) |
 | `GET /provider` | The provider of the parts role, `{provider}`, for the spend line under the analyse button |
+| 🟢 **NEW · S38** `GET /health` | `{app: "fact-checker", version, pid, home, writable}`: doctor, setup and the extension tell the helper from another program on the port; `writable` is false when the helper cannot write its home (a start inside an agent's sandbox) |
 
 **Collector API** (`src/collector/src/index.ts`; tables in `schema.sql`)
 
@@ -167,9 +170,11 @@ flowchart LR
 | `GET /analyses` | the owner | The pending uploads |
 | `POST /analyses/<video_id>/approve\|reject?lang=` | the owner | Serve the best pending upload, or delete the pending ones |
 | `DELETE /analyses/<video_id>?lang=` | the owner | Remove a served analysis |
+| 🟢 **NEW · S37** `GET /a/<video_id>?lang=` | anyone, no install id | A read-only HTML page of the approved analysis: each flag with its verdict, severity and sources, and the severity rubric; 404 when none is approved |
 
 - A sent mark holds: video, second, type, label, quote (≤ 1,000 characters), confidence, verdict, reason (≤ 500), provider, model, helper version, install id. Rows hold no name, email, IP or path.
-- A shared analysis holds only `video_id`, `lang`, `spoken`, `status`, `published_at`, `title`, `channel`, `duration`, `speakers`, `readers`, `cost_usd`, `analysed_until`, `flags`.
+- A shared analysis holds only `video_id`, `lang`, `spoken`, `status`, `published_at`, `title`, `channel`, `duration`, `speakers`, `people`, `readers`, `cost_usd`, `analysed_until`, `flags`.
+- 🟡 **CHANGED · S35** A shared analysis also holds `claims`: per speaker name `{checked, correct}`, the tally of `claims.jsonl`, numbers only.
 
 **Settings file** (`<helper home>/config.toml`; `fact-checker setup` writes it from `config.example.toml`)
 
@@ -201,7 +206,7 @@ flowchart LR
 | `judge(flags, transcript, llm, reader) -> {flag_id: {verdict, reason, speaker?}}` | The judge's verdict on every non-context flag |
 | Fact-check | `search(claim, language) -> list[PublishedCheck]` |
 
-**Display rule**: a flag goes on the player when its confidence reaches the bar of its type in `src/helper/fact_checker/thresholds.json` (🟢 **NEW · S20** for another provider, `thresholds.<provider>.json`; with no such file, every bar is 0.8); the helper writes the result in `on_player`. `fact-checker eval --save` sets the bars of the provider in use from the golden dataset: the lowest confidence with precision ≥ 0.80, or `null` (never) with fewer than 5 flags. Flags under the bar go to the side panel. The viewer can narrow the rule with quiet mode (confidence ≥ 0.9 only) and pin a card past its 8 seconds; both live in the extension only.
+**Display rule**: a flag goes on the player when its confidence reaches the bar of its type in `src/helper/fact_checker/thresholds.json` (🟢 **NEW · S20** for another provider, `thresholds.<provider>.json`; with no such file, every bar is 0.8); the helper writes the result in `on_player`. `fact-checker eval --save` sets the bars of the provider in use from the golden dataset: the lowest confidence with precision ≥ 0.80, or `null` (never) with fewer than 5 flags. Flags under the bar go to the side panel. The viewer can narrow the rule with quiet mode (serious flags only; a flag not yet judged shows at confidence ≥ 0.9) and pin a card past its 8 seconds; both live in the extension only.
 
 ## Seams
 
@@ -264,7 +269,7 @@ flowchart LR
 - Models: `gpt-5.5` reads, judges and gives verdicts; `gpt-5.4-mini` searches. No default model: a role with no model in `config.toml` passes no `-m`, so Codex uses the account's own default, and its usage lines say `codex-default`. Codex 0.169.0 on a ChatGPT account rejects `gpt-5.5` and `gpt-5.4-mini`; `codex debug models` lists the models of the plan.
 - No dollar cost: a reading logs tokens and `cost_usd` 0.
 - Limits: ChatGPT plan limits; not documented for exec.
-- Command: `CODEX_BIN`, else `codex` on PATH.
+- Command: `CODEX_BIN`, else `codex` on PATH, else 🟢 **NEW · S39** the one inside the ChatGPT app (`/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`); `setup` adds its folder to the login helper's PATH when Codex reads.
 - Environments: the person's own account; no sandbox.
 
 **Anthropic Messages API**
@@ -320,7 +325,8 @@ The helper and the extension run on each person's macOS (Apple silicon or Intel)
 | Piece | Used for |
 |---|---|
 | Helper process | `fact-checker serve` on `127.0.0.1:8765` (`--port` to change), started after loading `.env` so that `FACT_CHECK_API_KEY` is set; without it the fact-check step is skipped. 🟢 **NEW · S20** `FACT_CHECK_PROVIDER=codex` reads with Codex CLI instead of Claude Code. `~/.fact-checker/config.toml` picks the provider (`claude`, `codex`, `anthropic`, `openai`) and the model of each role; `fact-checker doctor` prints them and names a missing API key variable |
-| Install | `uv tool install ./src/helper`; `fact-checker setup` checks claude (logged in), uv, yt-dlp, ffmpeg and Chrome or Chromium, then starts the helper at login: a launchd agent `com.fact-checker.helper` on macOS, a systemd user service `fact-checker.service` on Linux, with the PATH of the setup shell. `fact-checker doctor` prints one line per check with its fix. The helper reads optional keys (`HF_TOKEN`, `FACT_CHECK_API_KEY`) from `~/.fact-checker/.env`. `install.sh` installs uv, yt-dlp, ffmpeg (imageio-ffmpeg static build) and the helper, each only if missing, then runs `setup`; `INSTALL-AGENT.md` leads an AI agent through it. `setup` writes the logged-in agent CLI (`claude`, then `codex`) into a new `config.toml` and copies the built extension to `~/.fact-checker/extension`. `fact-checker key set <NAME>` stores a key from a hidden prompt; `doctor --json` gives the checks to an agent |
+| 🟢 **NEW · S38** Helper ports | `fact-checker serve` without `--port` takes the first free port of 8765–8769 (`FACT_CHECKER_PORT` moves the range, for tests); with all five taken it logs one line and exits 0, and the login agent restarts it only after a failure. The extension finds the helper over the five ports by `/health` and keeps the port. `setup` stops the fact-checker helpers of its home in the range, then waits for `/health`; `doctor` names another program on a port and an agent's sandbox |
+| Install | `uv tool install ./src/helper`; `fact-checker setup` checks claude (logged in), uv, yt-dlp, ffmpeg and Chrome or Chromium, then starts the helper at login: a launchd agent `com.fact-checker.helper` on macOS, a systemd user service `fact-checker.service` on Linux, with the PATH of the setup shell. `fact-checker doctor` prints one line per check with its fix. The helper reads optional keys (`HF_TOKEN`, `FACT_CHECK_API_KEY`) from `~/.fact-checker/.env`. `install.sh` installs uv, yt-dlp, ffmpeg (imageio-ffmpeg static build) and the helper, each only if missing, then runs `setup`; `INSTALL-AGENT.md` leads an AI agent through it. `setup` writes the logged-in agent CLI (`claude`, then `codex`) into a new `config.toml` and copies the built extension to `~/.fact-checker/extension`. 🟢 **NEW · S39** `setup --provider claude|codex` writes the provider the installing agent names (only if it is logged in; the other lines of `config.toml` stay); `fact-checker provider [claude|codex]` prints the provider, or writes it and restarts the login helper (`launchctl kickstart -k`, `systemctl --user restart`). `fact-checker key set <NAME>` stores a key from a hidden prompt; `doctor --json` gives the checks to an agent |
 | Speech engine | mlx-whisper on Apple silicon, faster-whisper on other machines, both through `uv run --script`; with no uv, a video without captions stops with a reason that names the doctor |
 | Chrome, unpacked extension | The display; it says when the helper does not answer. `npm run build` writes it into the helper package (`src/helper/fact_checker/extension/`, committed), so a person needs no Node.js. Its texts follow the browser language (Spanish for `es*`, else English), with an ES/EN choice in ⚙ |
 | `~/.fact-checker/` | The helper home: see Components |
@@ -400,6 +406,12 @@ Each person runs their own helper and pays their own readings. The collector sha
 | Nothing is shared before the person says yes once; each mark then sends itself; a mark given with sharing off never leaves (S27, S30) | Consent first; testers missed the send button | A send button; asking at install |
 | A shared analysis is whole, served only after the owner approves it, and replaced only by a higher-ranked parts model (S28, S30) | Nobody can plant flags; the best reading wins | Serving every upload |
 | The built extension ships in the helper package; ffmpeg comes from the imageio-ffmpeg wheel (S25) | A person needs no Node.js and no Homebrew | A committed `dist/`; Homebrew or apt |
+| Only guests go on a card; the role comes from the speaker reading and the person corrects it (chat) | The card profiles the interviewee, not host against guest | Every speaker on the card |
+| Severity in three levels by a rubric (materiality, centrality, magnitude; never intent) on each kept flag; a "Puntualización" stays its own verdict, apart from severity (chat) | Some misleading claims matter little, others a lot; the player and the card share one field | Confidence as a stand-in for severity |
+| 🟢 **NEW · S35** The card follows the author's CALVET brand; its fonts ship in the helper, with no external font request (chat) | One look across the author's channels; the image renders offline | The S14 infographic |
+| 🟢 **NEW · S37** The card links to the page of its approved analysis on the collector (chat) | The sources and the rubric behind each number are one click away | A per-video page in the helper, which nobody else can open |
+| 🟢 **NEW · S35** No topic per claim; the card has no weakest topic (chat) | A topic field costs every part reading for one line of the card | A topic per claim in the part reading |
+| 🟢 **NEW · S36** A comparison needs every flag of each person marked; rates per hour of speech; no score or ranking (chat) | A partial review would compare the reviewer's effort, not the speakers | A single score per person |
 
 ## Security
 

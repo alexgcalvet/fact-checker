@@ -12,10 +12,10 @@ The person wants to share what an interview held in one post on X, with each spe
 - [X] A1 · The summary keeps each speaker's most serious reviewed flags
   - **Story:** A flag file with two speakers holds, for the guest, a false figure, a dodged question, a contradiction, a disputed figure and a fallacy marked correct, plus a false figure marked unfair; the host has one fallacy marked correct. The summary has two columns: the guest's lists the false figure, the contradiction and the dodged question, in that order, with counts of every reviewed type; the host's lists the fallacy. The unfair flag appears nowhere.
   - **Edge case:** WHEN the video has five speakers THEN the four who speak most get a box with up to two flags each, and the footer says "y 1 más".
-  - **Test:** `tests/acceptance/test_s14_a1_summary_content.py`
+  - **Test:** retired: replaced by S35 A1
 - [X] A2 · The summary is one 1080×1350 PNG that holds everything
   - **Story:** The person exports the summary of an invented interview whose flags have long quotes. They get one PNG of 1080×1350 with the title, the timeline, both columns and the footer; no text runs outside the image and no text is smaller than 26 px.
-  - **Test:** `check: bash tests/acceptance/s14-a2-summary-png.sh`
+  - **Test:** retired: replaced by S35 A3
 - [X] A3 · The person exports the summary from the side panel
   - **Story:** On a page that mimics the YouTube player, the person opens the side panel and clicks "Exportar resumen". The extension asks the helper for the summary of that video and opens the PNG in a new tab, with the alt text ready to copy under it.
   - **Test:** `tests/acceptance/s14-a3-export-button.test.ts`

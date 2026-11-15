@@ -1,18 +1,21 @@
 import argparse
+import errno
 import html
 import json
 import os
 import platform
 import re
 import shutil
+import tempfile
 import threading
 import time
 import tomllib
+from collections import Counter
 from dataclasses import replace
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from fact_checker import analyses, feedback
 from fact_checker.adapters.diarization import Diarizer
@@ -62,19 +65,23 @@ API = {"anthropic": ("https://api.anthropic.com", "ANTHROPIC_API_KEY"),
        "chat": ("http://localhost:11434/v1", "CHAT_API_KEY")}
 WEB_SEARCH = ("claude", "codex", "anthropic", "openai")  # the providers whose models search the web themselves
 SUMMARY_TEMPLATE = Path(__file__).parent / "summary.html"
-SHARE_TEXTS = {"es": {"title": "Resumen", "copy": "Texto alternativo, listo para copiar:"},
-               "en": {"title": "Summary", "copy": "Alt text, ready to copy:"}}
+SHARE_TEXTS = {"es": {"title": "Fichas", "copy": "Texto alternativo, listo para copiar:", "series": "Serie",
+                      "apply": "Aplicar", "hint": "por ejemplo 1/3 · Candidatos a la Xunta"},
+               "en": {"title": "Cards", "copy": "Alt text, ready to copy:", "series": "Series", "apply": "Apply",
+                      "hint": "for example 1/3 · Candidates for mayor"}}
 SHARE_PAGE = """<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>{title}</title></head>
 <body style="margin:24px;background:#121417;color:#f1f3f5;font:16px -apple-system,Arial,sans-serif">
-<img src="summary.png" alt="{alt}" style="display:block;width:540px;max-width:100%">
-<p>{copy}</p>
-<textarea rows="12" style="width:540px;max-width:100%" readonly>{alt}</textarea>
+<form style="margin-bottom:24px"><label>{series_label} <input name="series" value="{series}" placeholder="{hint}"
+ style="width:320px"></label> <button>{apply}</button></form>
+{cards}
 </body></html>"""
+SHARE_CARD = """<section style="margin-bottom:32px"><img src="{src}" alt="{alt}" style="display:block;width:540px;max-width:100%">
+<p>{copy}</p><textarea rows="8" style="width:540px;max-width:100%" readonly>{alt}</textarea></section>"""
 
 
-def summary_page(data: dict) -> str:
-    """The HTML page of the shareable image, from the flag file with marks."""
-    return summary.page(summary.summarize(data), SUMMARY_TEMPLATE.read_text(),
+def summary_page(data: dict, name: str, series: str | None = None) -> str:
+    """The HTML page of the card of `name`, from the flag file with marks."""
+    return summary.page(summary.card(data, name, series), SUMMARY_TEMPLATE.read_text(),
                         thumbnail(data["video_id"], default_home()))
 
 
@@ -225,6 +232,8 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
     path = bars_file(home)
     bars = thresholds if thresholds is not None else json.loads(path.read_text()) if path.exists() else {}
     store = Store(home)
+    # A role the person set survives a later naming of the voices.
+    kept = {n: p for n, p in ((store.load(video_id) or {}).get("people") or {}).items() if p.get("set_by") == "person"}
     data = {"video_id": video_id, "published_at": None, "status": "running", "stop_reason": None,
             "analysed_until": from_t, "speakers": {}, "flags": []} | ({"readers": readers} if readers else {}) \
         | ({"lang": lang} if lang else {})
@@ -274,12 +283,17 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
                 flag.speaker = speakers.voice_at(tr, flag.t) or flag.speaker
 
     def hear_voices():
-        """Separates and names the voices; a failure keeps the names from the text."""
+        """Separates and names the voices, with the role, person and seconds of speech of each; a failure keeps the
+        names from the text."""
         nonlocal tr
         lines, t0 = [], time.monotonic()
         try:
-            voiced = speakers.assign(tr, voices.turns(video_id))
-            voiced = replace(voiced, speakers=speakers.name(voiced, Logged(budgeted, usage("speakers"), lines), reader))
+            turns = voices.turns(video_id)
+            voiced = speakers.assign(tr, turns)
+            named = speakers.name(voiced, Logged(budgeted, usage("speakers"), lines), reader)
+            voiced = replace(voiced, speakers={v: n["name"] for v, n in named.items()})
+            people = speakers.people(named, turns)
+            people |= {n: people[n] | {"role": p["role"], "set_by": "person"} for n, p in kept.items() if n in people}
         except Exception as e:
             lines.append(usage("speakers")(t0) | {"stop_reason": f"error: {e}"})
             voiced = None
@@ -290,7 +304,7 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
                     tr = voiced
                     shown = store.load(video_id)
                     name_voices(shown["flags"])
-                    store.save(shown | {"speakers": tr.speakers, "cost_usd": round(cost[0], 6)})
+                    store.save(shown | {"speakers": tr.speakers, "people": people, "cost_usd": round(cost[0], 6)})
         finally:
             heard.set()
 
@@ -371,7 +385,7 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
                 outcomes = [next(found) if o == "unchecked" else o for o in outcomes]
         finally:
             store.add_claims(video_id, result.claims, outcomes)
-        return result, lines
+        return result, lines, [(c.t, c.speaker) for c, o in zip(result.claims, outcomes) if o in ("flagged", "ok")]
 
     stop = threading.Event()
     chunks = in_order(scheduler.follow(tr, viewer, stop) if viewer else scheduler.plan(tr, from_t))
@@ -386,8 +400,16 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
             t = done
         return t
 
+    tally = {"claims": [], "questions": []}  # (second, speaker) of each checked claim and each question asked
+
+    def counts() -> dict:
+        """The checked claims and the questions put to each speaker, by the voice heard at each second once the
+        voices are known: the card's "de 26" and "de 11"."""
+        return {key: dict(Counter(speakers.voice_at(tr, t) or who for t, who in rows))
+                for key, rows in tally.items()}
+
     def on_done(chunk, outcome):
-        result, steps = outcome
+        result, steps, checked = outcome
         for flag in result.flags:
             bar = bars.get(flag.type, DEFAULT_BAR)
             flag.on_player = bar is not None and flag.confidence >= bar
@@ -399,6 +421,9 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
             finished.append((chunk.start, chunk.end))
             log(steps)
             data = store.load(video_id) | {"analysed_until": analysed_until(), "cost_usd": round(cost[0], 6)}
+            tally["claims"] += checked
+            tally["questions"] += result.questions
+            data |= counts()
             data.setdefault("first_flags_s", round(time.monotonic() - asked, 2))
             store.save(data)
 
@@ -411,7 +436,7 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
         data["flags"] = judged(data["flags"], tr, Logged(scheduler.BudgetedLLM(judge, budgeted.left), usage("judge"), lines),
                                reader)
         log(lines)
-    store.save(data | {"status": status, "stop_reason": reason, "cost_usd": round(cost[0], 6)})
+    store.save(data | counts() | {"status": status, "stop_reason": reason, "cost_usd": round(cost[0], 6)})
     return status == "done" and all(any(a <= s.t < b for a, b in finished) for s in tr.segments)
 
 
@@ -531,27 +556,51 @@ def handler(helper: Helper):
                 data["flags"] = [f | {"mark": marks[f["id"]]} if f["id"] in marks else f for f in data["flags"]]
             return data
 
-        def _summary(self, video_id: str, kind: str) -> None:
+        def _summary(self, video_id: str, kind: str, query: dict) -> None:
+            """The page of one card per guest, or the PNG or alt text of the card of `person` (the first guest by
+            default); `series` adds the series line."""
             data = self._flag_file(video_id)
             if not data:
                 return self._reply(404, {"error": "not analysed"})
+            guests = summary.guests(data)
+            series = query.get("series", [""])[0].strip()[:80]
+            if not kind:
+                words = SHARE_TEXTS[data.get("lang") or "es"]
+                cards = "".join(SHARE_CARD.format(
+                    src=html.escape("summary.png?" + urlencode({"person": g} | ({"series": series} if series else {}))),
+                    alt=html.escape(summary.alt_text(summary.card(data, g, series))), copy=words["copy"])
+                    for g in guests)
+                page = SHARE_PAGE.format(lang=data.get("lang") or "es", cards=cards, series=html.escape(series),
+                                         series_label=words["series"], title=words["title"], hint=words["hint"],
+                                         apply=words["apply"])
+                return self._send(page.encode(), "text/html; charset=utf-8")
+            name = query.get("person", guests[:1])[0] if guests else None
+            if name not in guests:
+                return self._reply(404, {"error": "unknown person"})
             if kind == ".png":
-                return self._send(screenshot(summary_page(data)), "image/png")
-            shown = summary.summarize(data)
-            alt = summary.alt_text(shown)
-            if kind == ".txt":
-                return self._send(alt.encode(), "text/plain; charset=utf-8")
-            page = SHARE_PAGE.format(alt=html.escape(alt), lang=shown["lang"], **SHARE_TEXTS[shown["lang"]])
-            self._send(page.encode(), "text/html; charset=utf-8")
+                return self._send(screenshot(summary_page(data, name, series)), "image/png")
+            self._send(summary.alt_text(summary.card(data, name, series)).encode(), "text/plain; charset=utf-8")
+
+        def _health(self) -> None:
+            """Says that this is fact-checker, and whether it can write its home: a sandboxed start cannot."""
+            try:
+                with tempfile.TemporaryFile(dir=helper.home):
+                    writable = True
+            except OSError:
+                writable = False
+            self._reply(200, {"app": "fact-checker", "version": feedback.helper_version(), "pid": os.getpid(),
+                              "home": str(helper.home), "writable": writable})
 
         def do_GET(self):
+            if urlparse(self.path).path == "/health":
+                return self._health()
             if urlparse(self.path).path == "/share":
                 return self._reply(200, {"share": consent(helper.home)})
             if urlparse(self.path).path == "/provider":  # the analyse button says what a reading spends
                 return self._reply(200, {"provider": role(helper.home, "parts")["provider"]})
             m = re.fullmatch(r"/videos/([A-Za-z0-9_-]{6,20})/summary(\.png|\.txt)?", urlparse(self.path).path)
             if m:
-                return self._summary(m[1], m[2])
+                return self._summary(m[1], m[2], parse_qs(urlparse(self.path).query))
             video_id, query = self._video()
             if video_id:
                 if "at" in query:
@@ -593,6 +642,25 @@ def handler(helper: Helper):
                 helper.share()
             self._reply(200, {"ok": True})
 
+        def _people(self, video_id: str) -> None:
+            """The person sets the role of one speaker; a later naming of the voices keeps it."""
+            try:
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            except (ValueError, json.JSONDecodeError):
+                return self._reply(400, {"error": "bad json"})
+            data = helper.store.load(video_id)
+            if not data:
+                return self._reply(404, {"error": "not analysed"})
+            name = body.get("name")
+            if name not in data.get("speakers", {}).values():
+                return self._reply(400, {"error": "unknown speaker"})
+            if body.get("role") not in ("host", "guest"):
+                return self._reply(400, {"error": "bad role"})
+            people = data.get("people") or {}
+            people[name] = people.get(name, {"person": name}) | {"role": body["role"], "set_by": "person"}
+            helper.store.save(data | {"people": people})
+            self._reply(200, {"people": people})
+
         def _share(self) -> None:
             try:
                 on = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))["share"]
@@ -606,9 +674,9 @@ def handler(helper: Helper):
         def do_POST(self):
             if urlparse(self.path).path == "/share":
                 return self._share()
-            m = re.fullmatch(r"/videos/([A-Za-z0-9_-]{6,20})/marks", urlparse(self.path).path)
+            m = re.fullmatch(r"/videos/([A-Za-z0-9_-]{6,20})/(marks|people)", urlparse(self.path).path)
             if m:
-                return self._mark(m[1])
+                return self._mark(m[1]) if m[2] == "marks" else self._people(m[1])
             video_id, query = self._video()
             if video_id:
                 try:
@@ -626,19 +694,37 @@ def handler(helper: Helper):
     return Handler
 
 
-def serve(port: int) -> None:
+def ports() -> range:
+    """The five ports the helper tries in order: 8765–8769, or five from FACT_CHECKER_PORT."""
+    first = int(os.environ.get("FACT_CHECKER_PORT", 8765))
+    return range(first, first + 5)
+
+
+def serve(port: int | None = None) -> None:
+    """Serves on `port`, or on the first free port of `ports()`; with all five taken, says so and ends with exit 0,
+    so the login agent does not start it again."""
     for key, value in read_env(default_home()).items():
         os.environ.setdefault(key, value)
     helper = Helper(default_home())
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), handler(helper))
-    print(f"fact-checker helper on http://127.0.0.1:{port}", flush=True)
+    tries = [port] if port else ports()
+    for candidate in tries:
+        try:
+            httpd = ThreadingHTTPServer(("127.0.0.1", candidate), handler(helper))
+            break
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE or port:
+                raise
+    else:
+        print(f"fact-checker helper: ports {tries[0]}–{tries[-1]} are all taken by other programs; stopping", flush=True)
+        raise SystemExit(0)
+    print(f"fact-checker helper on http://127.0.0.1:{candidate}", flush=True)
     helper.share()  # the marks that waited for a collector that did not answer
     httpd.serve_forever()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="fact-checker serve")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int)
     serve(parser.parse_args().port)
 
 

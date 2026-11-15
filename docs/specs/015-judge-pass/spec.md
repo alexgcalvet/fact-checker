@@ -17,7 +17,7 @@ Each flag is found while reading one part of the video, so it can miss who is sp
   - **Story:** On a page that mimics the YouTube player, the flag file has a kept fallacy, a false figure judged "puntualización", a dropped flag and a dropped flag the person marked correct. The fallacy shows as usual; the "puntualización" shows as a small grey card titled "Puntualización" with the judge's reason; the dropped flag never shows on the player and appears struck through in the panel as "Descartado por el juez"; the flag marked correct shows as found.
   - **Test:** `tests/acceptance/s15-a2-judge-display.test.ts`
 - [X] A3 · The shareable summary takes the speaker from the judge
-  - **Story:** A flag marked correct that the judge gave from "Luis" to "Ana Ruiz" appears in Ana Ruiz's column of the summary image, and a flag the judge dropped and the person never marked appears nowhere.
+  - **Story:** A flag marked correct that the judge gave from "Luis" to "Ana Ruiz" appears on Ana Ruiz's card (S35), and a flag the judge dropped and the person never marked appears nowhere.
   - **Test:** `tests/acceptance/test_s15_a3_summary_speaker.py`
 - [X] A4 · The judge agrees with the person's marks on the 1.5-hour interview
   - **Story:** The person runs `fact-checker judge <video id> --against-marks` on the analysed 1.5-hour interview. It judges it again and prints how many of the flags the person marked unfair the judge dropped or turned into "puntualización", and how many of those marked correct it touched; it exits 0 only with at least 6 unfair ruled out and at most 1 correct touched (first blind run: 8 of 9 and 4 of 10; after the person reviewed the judge's reasons: 12 of 13 and 0 of 6).

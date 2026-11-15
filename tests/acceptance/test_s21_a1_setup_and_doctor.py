@@ -10,7 +10,7 @@ Setup: a temporary user home (HOME) and helper home (FACT_CHECKER_HOME). PATH ho
 `claude` (answers `auth status --json` with loggedIn from FAKE_CLAUDE_LOGGED), `uv`, `yt-dlp`, `ffmpeg`, `chromium`,
 and `launchctl` and `systemctl`, which only write their arguments to a log; the real ones never run. The operating
 system is set by replacing platform.system. The helper port is a free local port; a case that needs a running helper
-starts a small HTTP server on it. The last case installs the package for real with `uv tool install` into temporary
+starts the helper's HTTP server on it (S38: doctor knows the helper by its /health). The last case installs the package for real with `uv tool install` into temporary
 tool folders.
 """
 import json
@@ -22,12 +22,13 @@ import socket
 import subprocess
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
 from fact_checker import cli
+from fact_checker.server import Helper, handler
 
 HELPER_SRC = Path(__file__).parents[2] / "src" / "helper"
 REAL_HOME = Path.home()
@@ -141,7 +142,8 @@ def test_setup_and_doctor(machine, monkeypatch, capsys, tmp_path):
     plist = plistlib.loads(agent.read_bytes())
     assert plist["ProgramArguments"][-3:] == ["serve", "--port", str(machine.port)], \
         f"FAIL S21 A1 · ProgramArguments {plist['ProgramArguments']}"
-    assert plist["RunAtLoad"] is True and plist["KeepAlive"] is True, "FAIL S21 A1 · the agent does not stay up"
+    assert plist["RunAtLoad"] is True and plist["KeepAlive"] == {"SuccessfulExit": False}, \
+        "FAIL S21 A1 · the agent does not stay up"
     assert plist["EnvironmentVariables"]["PATH"] == str(machine.bin), "FAIL S21 A1 · the agent has no PATH"
     assert ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(agent)] in machine.calls(), \
         f"FAIL S21 A1 · {machine.calls()}"
@@ -163,7 +165,7 @@ def test_setup_and_doctor(machine, monkeypatch, capsys, tmp_path):
     (machine.bin / "chromium").write_text(f"#!{sys.executable}\n")
     (machine.bin / "chromium").chmod(0o755)
     (machine.helper / ".env").write_text("HF_TOKEN=invented\n")
-    server = ThreadingHTTPServer(("127.0.0.1", machine.port), BaseHTTPRequestHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", machine.port), handler(Helper(machine.helper)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         code, out = run(monkeypatch, capsys, "doctor", "--port", str(machine.port))

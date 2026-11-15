@@ -52,4 +52,4 @@ else
   uv tool install "$HELPER"
 fi
 
-fact-checker setup
+fact-checker setup "$@"

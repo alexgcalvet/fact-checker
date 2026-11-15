@@ -5,7 +5,7 @@
 
 ## Summary
 
-A Chrome extension shows flags on top of the YouTube player while a recorded Spanish or English video plays: inaccurate claims, dodged questions, contradictions within the video and with the speaker's record, fallacies, and short context cards. A local Python helper fetches the captions, reads the video with the person's own Claude or ChatGPT subscription (or an API key), judges every flag once more over the whole transcript, and caches the flags per video. Testers install it in one step on macOS or Linux; with their consent, their marks and whole analyses go to the owner's collector, and an analysis the owner approves is served free to the next viewer (S15–S30).
+A Chrome extension shows flags on top of the YouTube player while a recorded Spanish or English video plays: inaccurate claims, dodged questions, contradictions within the video and with the speaker's record, fallacies, and short context cards. A local Python helper fetches the captions, reads the video with the person's own Claude or ChatGPT subscription (or an API key), judges every flag once more over the whole transcript, and caches the flags per video. Testers install it in one step on macOS or Linux; with their consent, their marks and whole analyses go to the owner's collector, and an analysis the owner approves is served free to the next viewer (S15–S30). Each reviewed interview gives one profile card per guest in the author's brand, and up to three interviews compare side by side (S33–S36).
 
 ## Problem
 
@@ -96,6 +96,15 @@ Details, contracts and decisions: [ARCHITECTURE.md](ARCHITECTURE.md).
 | S28 | Shared analyses | A whole analysis uploads its stripped flag file; a later viewer in the same language downloads it at once with no reading; the collector keeps the best model's analysis, with hard stops | A second viewer opens an analysed video and sees its flags at once, with "Shared analysis · free" | S27 |
 | S29 | Cheaper readings 2 | A cheap screen reading skips parts with nothing to check; Haiku searches by default; `chat` parts read in window mode; doctor lists the screen | The usage log shows small talk skipped by the screen, with no new setting for the person | S23 |
 | S30 | Ready to publish | Shared analyses served only after the owner approves them (`fact-checker shared list\|approve\|reject`); a consent box before anything is shared; "signals, not verdicts" and the spend line; no real names or video ids in the repo; `LICENSE`, `PRIVACY.md` | A stranger clones a repo that names no real person, and a new tester is asked once before anything leaves the laptop | S28 |
+| S31 | First flags fast | Reading starts at once with speakers from the text; voices separate in the background and fix the names of flags already shown | The person sees the first flags of a 15-minute interview in the first minute | S5 |
+| S32 | Judge keeps correct flags | The judge only keeps a flag, turns a small slip into a "Puntualización", or moves the line to its speaker | The person sees about 10 correct flags on the ABC interview, not about 4 | S15 |
+| S33 | Who is who | The speaker reading gives each voice a role (`host` or `guest`), a canonical person name and its seconds of speech; the side panel lists the speakers with their role, and the person can change a role; the summary image counts guests only | The person exports the summary of an interview and the host's flags are not in it; after switching a role in the panel, the image follows | S5, S14 |
+| S34 | Severity | The judge also rules `minor`, `moderate` or `serious` on each flag it keeps, by a published rubric (materiality, centrality, magnitude; never intent); a "Puntualización" stays its own verdict and has no severity; a serious card reads "Dato falso · grave"; quiet mode shows serious flags only | On the player, a serious flag reads "· grave", quiet mode hides the rest, and a puntualización still shows grey | S15, S32 |
+| S35 | Profile card | "Exportar resumen" gives one 1080×1350 card per guest in the CALVET design: thumbnail plate, the hook "N de M datos, falsos o engañosos", verdict bar, counts by severity, most repeated devices, dodged questions, the two most serious quotes with correction and source, an optional series line; text ≥ 30 px; a shared analysis carries the tally of checked and correct claims per speaker (numbers only), so its card matches a local one; the link of the card is S37 | The person exports an interview and gets the card of each guest, whose numbers match the side panel | S33, S34 |
+| S36 | Comparison | `fact-checker compare <id> <id> [<id>]` matches each guest by canonical name and gives one card with a column per person and rates per hour of speech; it stops if a flag of a person has no mark | The person compares three reviewed interviews and gets the card; with one unmarked flag, the command names it and stops | S35 |
+| S37 | Analysis page | The collector serves a read-only page per approved analysis: every flag with its verdict, severity and source, and the severity rubric; the card shows its address and its footer says the sources are at the link | The person opens the address on a card and sees each flag with its source | S35 |
+| S38 | Install with no terminal | `GET /health` names the helper; the helper serves on the first free port of 8765–8769 and the extension finds it there; setup replaces an old helper of the same home; doctor tells another program and an agent's sandbox apart; `INSTALL-AGENT.md` has the agent run every command, outside its sandbox with the person's approval | An agent given only the repo URL installs fact-checker while another program holds 8765, and the person's only manual step is loading the extension | S21, S25 |
+| S39 | The installing agent reads | `setup --provider` writes the subscription the installing agent names; setup and doctor find the Codex inside the ChatGPT app and put its folder on the login helper's PATH; `fact-checker provider` prints or switches the provider and restarts the login helper | A person who installs from Codex gets Codex as the reader with no file to edit, and one command switches it later | S25, S38 |
 
 ```mermaid
 flowchart LR
@@ -114,6 +123,15 @@ flowchart LR
   S12 --> S21 --> S24 --> S27 --> S28 --> S30
   S21 --> S25 --> S26
   S22 --> S25
+  S5 --> S31
+  S15 --> S32
+  S14 --> S33
+  S5 --> S33
+  S32 --> S34
+  S33 --> S35
+  S34 --> S35
+  S35 --> S36
+  S35 --> S37
 ```
 
 - **S1 to S7** is the first release: fallacies, fact checks that respect documented controversies, and dodged questions, scored on the golden dataset and on the person's marks of real videos.
@@ -128,6 +146,7 @@ flowchart LR
 - **S21, S25, S26** open the beta: one-step install on macOS and Linux, in Spanish and English.
 - **S24, S27, S28, S30** add the owner's collector: marks and whole analyses, shared only after consent, served only after approval.
 - **S29** cuts cost with no new setting.
+- **S33 to S37** turn the summary into a profile of each guest, a comparison of up to three and a public page behind each card; S33 and S34 can be built in parallel.
 
 ## S0 checklist
 
@@ -150,6 +169,9 @@ Everything runs on the person's laptop (chat).
 
 | Question | Answer |
 |---|---|
+| Where does the card's link go? | To a read-only page of the approved analysis on the collector, with every flag, its source and the rubric (S37) (2026-11-15, chat) |
+| Does the card show a weakest topic? | No: claims carry no topic, and the card ships without that line (2026-11-15, chat) |
+| What card does a shared analysis give? | The same as a local one: the shared analysis carries the tally of checked and correct claims per speaker (2026-11-15, chat) |
 | Who uses Step 1? | The person, and beta testers on their own macOS or Linux machine with their own subscription (2026-11-15, docs/specs/021-beta-install/spec.md, docs/specs/025-one-step-install/spec.md). Was: only the person (2026-11-13) |
 | How is a speaker attributed? | Voices come from the audio (pyannote) and the LLM names them from the whole interview; without a Hugging Face token, the LLM infers them from the text, and the loss is measured (2026-11-14, 2026-11-15, docs/specs/005-speakers-quotes-context/spec.md, docs/specs/021-beta-install/spec.md) |
 | Which sources count? | Official and primary first; others lower the confidence (2026-11-13, docs/research/interview-youtube-fact-checker.md). An official figure is not the truth by itself: a documented controversy on a metric gives "disputed", not "false"; source tiers by independence (2026-11-14, docs/research/official-data-controversies.md) |
@@ -172,6 +194,10 @@ Everything runs on the person's laptop (chat).
 | The budget of 60 tool calls per video-hour? | Kept at 60 per started video-hour for parts, verdicts and speakers, plus the judge's calls; the search and the screen each get a budget of the same size (S15, S17, S29; `core/scheduler.py`) |
 | Which player threshold? | A bar per flag type: the lowest confidence with precision ≥ 0.80 on the golden dataset, null with fewer than 5 flags; one bars file per provider (S3, S20) |
 | Does the collector answer as the helper expects? | Yes: `tests/acceptance/test_contract_collector_marks.py` passed against the deployed Worker (2026-11-15, person) |
+| Which speakers go on the summary? | Guests only; the host's flags stay on the player and the panel (2026-11-15, chat) |
+| A skill or code for the cards? | Code in the helper: the data is structured, the image is deterministic and costs no tokens, and testers have it too (2026-11-15, chat) |
+| What does the card show? | The review panel's choices: hook "N de M datos, falsos o engañosos", dodged questions kept, a series line, the word "grave" with the rubric behind the link, no score or ranking (2026-11-15, chat) |
+| Does severity replace "Puntualización"? | No: a puntualización stays its own verdict; severity applies to the flags the judge keeps (2026-11-15, chat) |
 
 **Open**
 

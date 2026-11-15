@@ -22,6 +22,8 @@ export const TYPE_COLOR = Object.fromEntries(Object.entries(TYPE_LOOK).map(([typ
  * sources and confidence, and dims the past. It scrolls with the playhead until the person scrolls it; then
  * "Ir al directo" brings it back.
  * Its header holds a filter per family, a button that exports the shareable summary of the video, and a ⚙.
+ * Under the filters, once the voices are told apart, each speaker with its role; a click on the role switches it
+ * between host and guest and calls `setRole`, so the summary follows.
  * With `sharing`, its foot says whether each mark is shared with the project's author, and the ⚙ box switches it;
  * the helper is asked again each time the panel opens.
  */
@@ -32,6 +34,7 @@ export function mountPanel(
   show: (flag: Flag) => void,
   exportSummary: () => void = () => {},
   sharing?: Sharing,
+  setRole: (name: string, role: "host" | "guest") => void = () => {},
 ): () => void {
   const strip = div("fc-strip");
   const tip = div("fc-tip fc-s");
@@ -142,7 +145,9 @@ export function mountPanel(
     // Until the first part is read, the tab says so instead of a silent 0.
     const preparing = file?.status === "running" && file.first_flags_s === undefined;
     const stop = file?.status === "stopped" ? file.stop_reason : undefined;
-    const key = `${lang()}|${video.duration}|${analysed}|${only}|${preparing}|${stop}|${flags.map((f) => f.id).join("|")}`;
+    const people = Object.entries(file?.people ?? {});
+    const key = `${lang()}|${video.duration}|${analysed}|${only}|${preparing}|${stop}|${flags.map((f) => f.id).join("|")}|` +
+      people.map(([name, p]) => `${name}:${p.role}`).join("|");
     if (key === drawn) return;
     drawn = key;
     // The counts hold what stands: a flag the judge dropped waits folded at the end of the feed.
@@ -211,6 +216,20 @@ export function mountPanel(
     }
     const top = div("fc-fh");
     top.append(head, box, filters);
+    if (people.length) {
+      const list = div("fc-people");
+      for (const [name, p] of people) {
+        const line = div("");
+        line.append(span("", p.person), " · ", button(w.roles[p.role], () => {
+          p.role = p.role === "host" ? "guest" : "host";
+          p.set_by = "person";
+          setRole(name, p.role);
+          render();
+        }, ""));
+        list.append(line);
+      }
+      top.append(list);
+    }
 
     rows = flags.filter((f) => !only || look(f).family === only).map((f) => {
       const l = look(f);

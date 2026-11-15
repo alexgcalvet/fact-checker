@@ -12,11 +12,13 @@ with a script that puts a fake `uv` in ~/.local/bin; the fake `uv` writes each c
 helper's `fact-checker` command on `tool install` (the helper command runs the real CLI from src/helper), and answers
 the imageio-ffmpeg query with a fake ffmpeg file. `claude` is logged in and fails any reading; `codex` fails every call;
 `launchctl`, `systemctl`, `brew` and `sudo` only log; `chromium` exists. The last case installs the helper package for real with
-`uv tool install` into temporary tool folders.
+`uv tool install` into temporary tool folders. FACT_CHECKER_PORT moves the helper's ports to a free one, away from the
+person's helper on 8765–8769.
 """
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -83,7 +85,14 @@ def machine(tmp_path: Path) -> dict:
     home.mkdir()
     return {"PATH": f"{fakes}{os.pathsep}{system}", "HOME": str(home), "FACT_CHECKER_HOME": str(home / ".fact-checker"),
             "FAKE_LOG": str(tmp_path / "calls.jsonl"), "FAKE_UV": str(tmp_path / "uv"),
-            "FAKE_FFMPEG": str(tmp_path / "ffmpeg-from-wheel"), "HELPER_SRC": str(HELPER_SRC)}
+            "FAKE_FFMPEG": str(tmp_path / "ffmpeg-from-wheel"), "HELPER_SRC": str(HELPER_SRC),
+            "FACT_CHECKER_PORT": str(free_port())}
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def install(env: dict) -> tuple[int, list[str], list[list[str]]]:

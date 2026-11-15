@@ -8,10 +8,12 @@ that says `provider = "codex"` stays byte for byte, also when Claude Code is log
 Setup: a temporary user home (HOME) and a new helper home (FACT_CHECKER_HOME) for each case. PATH holds only fakes:
 `claude` answers `auth status --json` with loggedIn from FAKE_CLAUDE_LOGGED and fails any other call; `codex` answers
 `login status` with exit 0 when FAKE_CODEX_LOGGED is 1 and fails any other call; `uv`, `yt-dlp`, `ffmpeg` and
-`chromium` exist; `launchctl` and `systemctl` only write their arguments to a log. The system is Linux.
+`chromium` exist; `launchctl` and `systemctl` only write their arguments to a log. The system is Linux. Setup uses a
+free local port, never the person's helper on 8765.
 """
 import json
 import platform
+import socket
 import sys
 import tomllib
 from pathlib import Path
@@ -32,6 +34,12 @@ FAKE_RECORDER = """\
 import json, os, sys
 open(os.environ["FAKE_LOG"], "a").write(json.dumps([os.path.basename(sys.argv[0])] + sys.argv[1:]) + "\\n")
 """
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def test_provider_detection(tmp_path, monkeypatch, capsys):
@@ -59,7 +67,7 @@ def test_provider_detection(tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
         monkeypatch.setenv("FAKE_CLAUDE_LOGGED", "1" if claude else "0")
         monkeypatch.setenv("FAKE_CODEX_LOGGED", "1" if codex else "0")
-        monkeypatch.setattr(sys, "argv", ["fact-checker", "setup", "--port", "8765"])
+        monkeypatch.setattr(sys, "argv", ["fact-checker", "setup", "--port", str(free_port())])
         try:
             cli.main()
             code = 0

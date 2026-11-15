@@ -1,11 +1,20 @@
 import json
 import os
+import shutil
 import signal
 import subprocess
 import tempfile
 from pathlib import Path
 
 from fact_checker.core.flags import split
+
+CHATGPT_CODEX = Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex")
+
+
+def codex_cli() -> str | None:
+    """The Codex command: CODEX_BIN or `codex` on PATH, else the one that ships inside the ChatGPT app."""
+    return shutil.which(os.environ.get("CODEX_BIN", "codex")) or (str(CHATGPT_CODEX) if CHATGPT_CODEX.is_file()
+                                                                   else None)
 
 
 class Answer(dict):
@@ -43,7 +52,7 @@ class CodexCLI:
                 "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="never"',
                 "--output-schema", f"{tmp}/schema.json", *([] if session else ["--ephemeral"]), "-"]
             proc = subprocess.Popen(
-                [os.environ.get("CODEX_BIN", "codex"), *head, *options], cwd=self.workdir, stdin=subprocess.PIPE,
+                [codex_cli() or "codex", *head, *options], cwd=self.workdir, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
             try:
                 stdout, stderr = proc.communicate(text, timeout=self.timeout)

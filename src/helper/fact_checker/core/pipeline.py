@@ -288,6 +288,7 @@ class ChunkResult:
     candidates: list[Candidate] = field(default_factory=list)
     claims: list[Claim] = field(default_factory=list)
     positions: list[Position] = field(default_factory=list)
+    questions: list[tuple[float, str]] = field(default_factory=list)  # (answer end, speaker) of each question asked
 
 
 def ledger(positions: list[Position]) -> str:
@@ -409,8 +410,6 @@ def analyze_chunk(chunk: Chunk, context: list[Segment], llm, names: dict[str, st
                                        kind=item.get("kind", "fact"), central=item.get("central", True),
                                        repeats=checked[n - 1].t if n and 0 < n <= len(checked) else None))
     for item in answer.get("questions", []):
-        if item["status"] == "answered":
-            continue
         end = _locate(item["answer_end"], words)
         if not end:
             continue
@@ -419,6 +418,8 @@ def analyze_chunk(chunk: Chunk, context: list[Segment], llm, names: dict[str, st
             continue
         speaker = _speaker(end[2], names, item["speaker"])
         if speaker is not None:
+            result.questions.append((end[3], speaker))
+        if speaker is not None and item["status"] != "answered":
             result.flags.append(Flag(t=end[3], speaker=speaker, quote=end[0], type="question", label=item["status"],
                                      answer=item["status"], reason=item["reason"], confidence=item["confidence"],
                                      related={"t": asked[1], "quote": asked[0]}))
