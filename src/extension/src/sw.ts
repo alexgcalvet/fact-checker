@@ -9,6 +9,7 @@ type HelperRequest =
   | { kind: "analyze"; videoId: string; from: number; lang: "es" | "en" }
   | { kind: "flags"; videoId: string; at?: number; lang?: "es" | "en" }
   | { kind: "summary"; videoId: string }
+  | { kind: "keys"; videoId: string; lang: "es" | "en" }
   | { kind: "share"; videoId: string }
   | { kind: "provider"; videoId: string }
   | { kind: "set-share"; videoId: string; share: boolean }
@@ -39,6 +40,11 @@ async function find() {
 async function call(req: HelperRequest) {
   // The helper's page shows the image with its alt text under it.
   if (req.kind === "summary") return chrome.tabs.create({ url: `${helper()}/videos/${req.videoId}/summary` }).then(() => null);
+  // The helper's key page takes the keys itself: it opens on the port where the helper answers, never on a guess.
+  if (req.kind === "keys") {
+    if (!(await isHelper(port)) && !(await find())) throw new TypeError("no fact-checker helper on ports 8765-8769");
+    return chrome.tabs.create({ url: `${helper()}/keys?lang=${req.lang === "en" ? "en" : "es"}` }).then(() => null);
+  }
   try {
     const res = await send(req);
     if (res.ok) return await res.json();
@@ -82,7 +88,7 @@ function send(req: HelperRequest) {
 }
 
 chrome.runtime.onMessage.addListener((req: HelperRequest, _sender, sendResponse) => {
-  if (!req || !VIDEO_ID.test(req.videoId) || !["analyze", "flags", "mark", "summary", "share", "set-share", "provider", "role"].includes(req.kind)) return;
+  if (!req || !VIDEO_ID.test(req.videoId) || !["analyze", "flags", "mark", "summary", "keys", "share", "set-share", "provider", "role"].includes(req.kind)) return;
   call(req)
     .then((data) => sendResponse({ ok: true, data }))
     // fetch rejects with a TypeError when nothing listens on the helper's port: the content script says so.

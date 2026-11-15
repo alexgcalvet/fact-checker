@@ -25,6 +25,10 @@
   }
   async function call(req) {
     if (req.kind === "summary") return chrome.tabs.create({ url: `${helper()}/videos/${req.videoId}/summary` }).then(() => null);
+    if (req.kind === "keys") {
+      if (!await isHelper(port) && !await find()) throw new TypeError("no fact-checker helper on ports 8765-8769");
+      return chrome.tabs.create({ url: `${helper()}/keys?lang=${req.lang === "en" ? "en" : "es"}` }).then(() => null);
+    }
     try {
       const res2 = await send(req);
       if (res2.ok) return await res2.json();
@@ -56,7 +60,7 @@
     }) : fetch(req.kind === "flags" && typeof req.at === "number" ? `${url}?at=${Math.max(0, Math.floor(req.at))}${req.lang ? `&lang=${req.lang === "en" ? "en" : "es"}` : ""}` : url);
   }
   chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
-    if (!req || !VIDEO_ID.test(req.videoId) || !["analyze", "flags", "mark", "summary", "share", "set-share", "provider", "role"].includes(req.kind)) return;
+    if (!req || !VIDEO_ID.test(req.videoId) || !["analyze", "flags", "mark", "summary", "keys", "share", "set-share", "provider", "role"].includes(req.kind)) return;
     call(req).then((data) => sendResponse({ ok: true, data })).catch((e) => sendResponse(e instanceof TypeError ? { ok: false, down: true } : { ok: false, error: String(e) }));
     return true;
   });

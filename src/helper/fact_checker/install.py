@@ -18,16 +18,18 @@ from pathlib import Path
 
 from fact_checker.adapters import whisper
 from fact_checker.adapters.screenshot import find_chrome
-from fact_checker.adapters.llm_chat_api import needs_key
 from fact_checker.adapters.llm_codex_cli import CHATGPT_CODEX
-from fact_checker.server import (API, ROLES, WEB_SEARCH, ports, provider, read_env, role, search_api, secret,
-                                 speech_cli)
+from fact_checker.server import (ROLES, key_names, ports, provider, read_env, role, secret, speech_cli,
+                                 write_key)
 from fact_checker.store import default_home
 
 LABEL = "com.fact-checker.helper"
 UNIT = "fact-checker.service"
 HERE = Path(__file__).parent
 WAIT = 5.0  # seconds that setup waits for an old helper to stop and for the login helper to answer
+INSTALL_CLAUDE = "curl -fsSL https://claude.ai/install.sh | bash"
+# The Claude app keeps its own Claude Code in a folder per version, which the next update removes.
+VERSIONED_CLAUDE = re.compile(r"/Claude/claude-code/\d[^/]*/")
 NO_AGENT_CLI = ("provider: no agent CLI logged in · fix: claude auth login (Claude subscription) or codex login "
                 "(ChatGPT subscription); to install one, see INSTALL-AGENT.md")
 
@@ -48,8 +50,11 @@ def _tool(name: str, fix: str) -> Check:
 
 
 def _claude() -> Check:
-    if not shutil.which("claude"):
-        return Check("claude", "missing", "curl -fsSL https://claude.ai/install.sh | bash", ok=False)
+    found = shutil.which("claude")
+    if not found:
+        return Check("claude", "missing", INSTALL_CLAUDE, ok=False)
+    if VERSIONED_CLAUDE.search(os.path.realpath(found)):
+        return Check("claude", "inside the Claude app, it moves on each update", INSTALL_CLAUDE, ok=False)
     status = subprocess.run(["claude", "auth", "status", "--json"], capture_output=True, text=True)
     try:
         logged_in = json.loads(status.stdout).get("loggedIn") is True
@@ -78,15 +83,9 @@ def _llm(name: str) -> list[Check]:
 
 
 def _keys(home: Path) -> list[Check]:
-    """Each key that the roles need, once, by its variable name only: an API provider's key (none for a chat server
-    on this machine), and the search service's key for a search model with no web search."""
-    settings = [role(home, name) for name in ROLES]
-    variables = [s["key_env"] for s in settings
-                 if s["provider"] in API and (s["provider"] != "chat" or needs_key(s["base_url"]))]
-    if settings[ROLES.index("search")]["provider"] not in WEB_SEARCH:
-        variables.append(search_api(home)[0])
+    """Each key that the roles need, by its variable name only."""
     return [Check(v, "set") if secret(home, v) else Check(v, "missing", f"add {v}=<key> to {home / '.env'}", ok=False)
-            for v in dict.fromkeys(variables)]
+            for v in key_names(home)]
 
 
 def tools(system: str, home: Path) -> list[Check]:
@@ -123,8 +122,9 @@ def health(port: int) -> dict | None:
     return answer if isinstance(answer, dict) and answer.get("app") == "fact-checker" else {}
 
 
-def _helper(ports) -> Check:
-    """The helper found by /health over `ports`; another program on a port is not the helper."""
+def _helper(ports) -> tuple[Check, dict]:
+    """The helper found by /health over `ports`, and its answer ({} without one); another program on a port is not
+    the helper."""
     found = {}
     try:
         for port in ports:
@@ -132,17 +132,24 @@ def _helper(ports) -> Check:
             if found[port]:
                 break
     except PermissionError:
-        return Check("helper", "blocked by the agent's sandbox", SANDBOX_FIX, ok=False)
+        return Check("helper", "blocked by the agent's sandbox", SANDBOX_FIX, ok=False), {}
     helper = next(((p, h) for p, h in found.items() if h), None)
     if helper and not helper[1]["writable"]:
         return Check("helper", f"running on port {helper[0]}, cannot write {helper[1]['home']}",
-                     f"stop it, then {SANDBOX_FIX}", ok=False)
+                     f"stop it, then {SANDBOX_FIX}", ok=False), helper[1]
     if helper:
-        return Check("helper", f"running on port {helper[0]}")
+        return Check("helper", f"running on port {helper[0]}"), helper[1]
     foreign = next((p for p, h in found.items() if h == {}), None)
     if foreign is not None:
-        return Check("helper", f"another program holds port {foreign}", "fact-checker setup", ok=False)
-    return Check("helper", f"not running on port {ports[0]}", "fact-checker setup", ok=False)
+        return Check("helper", f"another program holds port {foreign}", "fact-checker setup", ok=False), {}
+    return Check("helper", f"not running on port {ports[0]}", "fact-checker setup", ok=False), {}
+
+
+def seen_by_helper(check: Check, tools: dict) -> Check:
+    """A tool this terminal finds but the running helper does not: setup gives the helper this terminal's PATH."""
+    if check.ok and tools.get(check.name) is False:
+        return Check(check.name, f"the helper does not find {check.name}", "fact-checker setup", ok=False)
+    return check
 
 
 def doctor(port: int | None, as_json: bool = False) -> int:
@@ -151,14 +158,15 @@ def doctor(port: int | None, as_json: bool = False) -> int:
     env = read_env(home) | os.environ
     engine = speech_cli()
     roles = {name: role(home, name) for name in ROLES}
+    helper, answer = _helper([port] if port else ports())
     checks = [
         Check("provider", provider(home)),
         Check("models", ", ".join(f"{name} {r['model'] or 'account default'}" for name, r in roles.items())),
         *[Check(f"role {name}", " · ".join(x for x in (r["provider"], r["model"] or "account default", r["base_url"]) if x))
           for name, r in roles.items()],
         *_keys(home),
-        *tools(system, home),
-        _helper([port] if port else ports()),
+        *[seen_by_helper(c, answer.get("tools", {})) for c in tools(system, home)],
+        helper,
         Check("speech to text", ("mlx-whisper" if engine == whisper.CLI else "faster-whisper") if engine else "missing",
               "" if engine else "install uv (see uv above)"),
         Check("speaker separation", "on") if env.get("HF_TOKEN") else
@@ -251,17 +259,8 @@ def set_key(home: Path, name: str) -> int:
     if not value:
         print("key: nothing typed, nothing saved")
         return 1
-    home.mkdir(parents=True, exist_ok=True)
-    path = home / ".env"
-    lines = path.read_text().splitlines() if path.exists() else []
-    same = [i for i, line in enumerate(lines) if re.match(rf"#?\s*{name}\s*=", line)]
-    line = f"{name}={value}"
-    lines = [line if i == same[0] else x for i, x in enumerate(lines)
-             if i not in same[1:] or x.lstrip().startswith("#")] if same else [*lines, line]
-    path.touch(mode=0o600)
-    path.chmod(0o600)
-    path.write_text("\n".join(lines) + "\n")
-    print(f"{name}: saved in {path}. Run fact-checker setup to restart the helper with it.")
+    write_key(home, name, value)
+    print(f"{name}: saved in {home / '.env'}. Run fact-checker setup to restart the helper with it.")
     return 0
 
 

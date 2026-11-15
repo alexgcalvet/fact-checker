@@ -11,7 +11,7 @@ fact-checker is a Chrome extension and a small helper program. The helper reads 
 - If a command fails with "Operation not permitted", your sandbox blocked it. Ask the person to approve the command. Then run the same command again outside your sandbox.
 - Never run `fact-checker serve`. `fact-checker setup` starts the helper at every login.
 - Never ask the person to paste a key, a token or a password into the chat.
-- A key goes in only through `fact-checker key set <NAME>`. The person runs it in their own terminal.
+- A key goes in only through the helper's key page: on YouTube, ⚙ → Claves (Keys). If the person prefers a terminal, `fact-checker key set <NAME>` also works.
 - Never read, print or edit `~/.fact-checker/.env`.
 - Never run `sudo`.
 - If a command fails, read its output. Then run `fact-checker doctor --json` and follow step 4.
@@ -106,16 +106,16 @@ The output is one JSON object. `"ok"` is `true` when everything works. Each item
 | `chrome` | Tell the person the Chrome message below. Then run `fact-checker setup` |
 | `helper`, with the state `blocked by the agent's sandbox` | Ask the person to approve. Then run `fact-checker setup` and `fact-checker doctor --json` outside your sandbox |
 | `helper`, with any other state | Run `fact-checker setup` |
-| A variable name, such as `ANTHROPIC_API_KEY` | Tell the person the key message below, with that name |
+| A variable name, such as `ANTHROPIC_API_KEY` | Do step 5 first if the extension is not loaded. Then tell the person the key message below, with that name |
 | Any other check | Run the command in its `fix` |
 
 > **ES:** Falta Google Chrome. Descárgalo de https://www.google.com/chrome/ e instálalo. Avísame cuando esté.\
 > **EN:** Google Chrome is missing. Download it from https://www.google.com/chrome/ and install it. Tell me when it is done.
 
-> **ES:** Hace falta una clave. Abre la app Terminal, escribe `fact-checker key set ANTHROPIC_API_KEY` y pulsa Intro. Pega tu clave y pulsa Intro: no se verá mientras escribes. Nunca la pegues en este chat.\
-> **EN:** A key is needed. Open the Terminal app, type `fact-checker key set ANTHROPIC_API_KEY` and press Enter. Paste your key and press Enter: it stays hidden while you type. Never paste it in this chat.
+> **ES:** Hace falta una clave. Abre un vídeo de YouTube, abre el panel de avisos y pulsa ⚙ → Claves. Pega tu clave en el campo de `ANTHROPIC_API_KEY` y pulsa Guardar: no se verá. Nunca la pegues en este chat.\
+> **EN:** A key is needed. Open a YouTube video, open the flags panel and click ⚙ → Keys. Paste your key in the `ANTHROPIC_API_KEY` field and click Save: it stays hidden. Never paste it in this chat.
 
-After the person stores a key, run `fact-checker setup` to restart the helper.
+The helper uses a key from the key page at once. Run `fact-checker doctor --json` again. If the person used `fact-checker key set`, run `fact-checker setup` first to restart the helper.
 
 ## 5. Load the extension in Chrome
 

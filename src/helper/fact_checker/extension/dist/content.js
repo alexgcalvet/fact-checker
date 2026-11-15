@@ -164,6 +164,7 @@
       panel: "Avisos",
       export: "Exportar resumen",
       settings: "Ajustes",
+      keys: "Claves",
       all: "Todos",
       roles: { host: "Host", guest: "Invitada" },
       live: "Ir al directo",
@@ -254,6 +255,7 @@
       panel: "Flags",
       export: "Export summary",
       settings: "Settings",
+      keys: "Keys",
       all: "All",
       roles: { host: "Host", guest: "Guest" },
       live: "Jump to now",
@@ -829,6 +831,7 @@
   var TYPE_COLOR = Object.fromEntries(Object.entries(TYPE_LOOK).map(([type, l]) => [type, l.mark]));
   function mountPanel(layer, video, getFlags, show, exportSummary = () => {
   }, sharing, setRole = () => {
+  }, openKeys = () => {
   }) {
     const strip = div("fc-strip");
     const tip = div("fc-tip fc-s");
@@ -888,7 +891,8 @@
         choice(w.size, "size", [["S", "S"], ["M", "M"], ["L", "L"]]),
         choice(w.side, "side", [["left", w.left], ["right", w.right]]),
         quiet,
-        choice(w.language, "lang", Object.keys(TEXTS).map((l) => [l, l.toUpperCase()]))
+        choice(w.language, "lang", Object.keys(TEXTS).map((l) => [l, l.toUpperCase()])),
+        button(w.keys, openKeys)
       );
       if (sharing && shared !== null) {
         const line = document.createElement("label");
@@ -1202,7 +1206,8 @@
       overlay.show,
       () => send({ kind: "summary", videoId }),
       { get: () => shareReply({ kind: "share", videoId }), set: (on) => shareReply({ kind: "set-share", videoId, share: on }) },
-      (name, role) => send({ kind: "role", videoId, name, role })
+      (name, role) => send({ kind: "role", videoId, name, role }),
+      () => send({ kind: "keys", videoId, lang: lang() })
     );
     unmount = () => {
       unmountPanel();
