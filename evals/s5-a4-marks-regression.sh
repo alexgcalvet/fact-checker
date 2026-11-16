@@ -15,7 +15,7 @@
 # Usage: s5-a4-marks-regression.sh [flag-file]
 set -u
 video="${REAL_VIDEO:?set REAL_VIDEO to the id of the 112-minute interview in your helper home}"
-root=$(cd "$(dirname "$0")/../.." && pwd)
+root=$(cd "$(dirname "$0")/.." && pwd)
 home="${FACT_CHECKER_HOME:-$HOME/.fact-checker}"
 flags="${1:-}"
 
