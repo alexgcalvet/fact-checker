@@ -102,7 +102,7 @@ def tools(system: str, home: Path) -> list[Check]:
 
 
 SANDBOX_FIX = ("run fact-checker setup, then fact-checker doctor, outside the sandbox, "
-               "with the person's approval")
+               "with the person's approval; if you cannot, ask the person to run fact-checker setup in Terminal")
 
 
 def health(port: int) -> dict | None:

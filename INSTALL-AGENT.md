@@ -8,7 +8,7 @@ fact-checker is a Chrome extension and a small helper program. The helper reads 
 
 - Speak to the person in their language. Use the **ES** text for Spanish and the **EN** text for English.
 - Do every step yourself. Run every command yourself. Ask the person only when a step shows a message for the person.
-- If a command fails with "Operation not permitted", or setup says "launchd refused it", your sandbox blocked it. Ask the person to approve the command. Then run the same command again outside your sandbox.
+- If a command fails with "Operation not permitted", or setup says "launchd refused it", your sandbox blocked it. Ask the person to approve the command. Then run the same command again outside your sandbox. If you cannot, because the approval is refused or disabled, tell the person the Terminal message of step 4.
 - Never run `fact-checker serve`. `fact-checker setup` starts the helper at every login.
 - Never ask the person to paste a key, a token or a password into the chat.
 - A key goes in only through the helper's key page: on YouTube, ⚙ → Claves (Keys). If the person prefers a terminal, `fact-checker key set <NAME>` also works.
@@ -104,10 +104,17 @@ The output is one JSON object. `"ok"` is `true` when everything works. Each item
 |---|---|
 | `claude` or `codex` | Go to step 2 |
 | `chrome` | Tell the person the Chrome message below. Then run `fact-checker setup` |
-| `helper`, with the state `blocked by the agent's sandbox` | Ask the person to approve. Then run `fact-checker setup` and `fact-checker doctor --json` outside your sandbox |
+| `helper`, with the state `blocked by the agent's sandbox` | Ask the person to approve. Then run `fact-checker setup` and `fact-checker doctor --json` outside your sandbox. If you cannot run a command outside your sandbox, tell the person the Terminal message below |
 | `helper`, with any other state | Run `fact-checker setup` |
 | A variable name, such as `ANTHROPIC_API_KEY` | Do step 5 first if the extension is not loaded. Then tell the person the key message below, with that name |
 | Any other check | Run the command in its `fix` |
+
+The Terminal message starts the helper and prepares Chrome in one line. Use `codex` or `claude` as in step 3, and the folder path of step 3. On Linux, leave out `&& printf …` to the end.
+
+> **ES:** Falta un paso que yo no puedo hacer desde aquí. Abre la app Terminal, pega esta línea y pulsa Intro: `~/.local/bin/fact-checker setup --provider codex && printf %s "<ruta>" | pbcopy && open -a "Google Chrome" "chrome://extensions"`. Cuando veas «helper: running on port», Chrome se abrirá en la página de extensiones. Dímelo y seguimos.\
+> **EN:** One step is left that I cannot do from here. Open the Terminal app, paste this line and press Enter: `~/.local/bin/fact-checker setup --provider codex && printf %s "<path>" | pbcopy && open -a "Google Chrome" "chrome://extensions"`. When you see "helper: running on port", Chrome opens on its extensions page. Tell me, and we go on.
+
+After the person says the helper runs, go to step 5 and skip its commands: Chrome is open and the path is copied. Do not run `fact-checker doctor` again inside your sandbox: its helper check is blocked there.
 
 > **ES:** Falta Google Chrome. Descárgalo de https://www.google.com/chrome/ e instálalo. Avísame cuando esté.\
 > **EN:** Google Chrome is missing. Download it from https://www.google.com/chrome/ and install it. Tell me when it is done.
