@@ -118,8 +118,9 @@ def run_judge(video_id: str, home: Path, against_marks: bool) -> bool:
     if (home / "voices" / f"{video_id}.turns.json").exists():
         tr = speakers.assign(tr, Diarizer(home / "voices", audio).turns(video_id))
     tr = replace(tr, speakers=data["speakers"])
-    llm = scheduler.BudgetedLLM(server.provider_llm(home, "judge", timeout=judge.TIMEOUT), judge.calls(tr))
-    verdicts = judge.judge(data["flags"], tr, llm, data.get("lang"))
+    # Judging again reads twice and keeps the strictest ruling: one reading can let a sound flag go.
+    llm = scheduler.BudgetedLLM(server.provider_llm(home, "judge", timeout=judge.TIMEOUT), 2 * judge.calls(tr))
+    verdicts = judge.judge(data["flags"], tr, llm, data.get("lang"), readings=2)
     flags = [{k: v for k, v in f.items() if k != "judge"} for f in data["flags"]]
     data["flags"] = [f | {"judge": verdicts[f["id"]]} if f["id"] in verdicts else f for f in flags]
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1))

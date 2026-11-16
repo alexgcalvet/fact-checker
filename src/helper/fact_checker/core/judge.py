@@ -43,6 +43,9 @@ RULES = """\
   you do not check again. Rule "nitpick" only for a reason of reading: who said it, what exactly was claimed, or a
   small error by the rules below. Never rule "nitpick" because a source, an official figure or a government says the
   speaker is right: governments and parties also give false or framed figures. If you doubt the facts, keep the flag.
+- A nitpick needs a reason that the flag's own sources or the conversation give. "It cannot be checked", "it is a
+  valuation" or "the size backs it" are not reasons: if the flag cites a record or a measure against the speaker, keep
+  it. A figure more than about 1.4 times from the closest credible measure is never a nitpick.
 - A figure from the speaker's own government, party or an administration they lead or led never makes the speaker
   right by itself.
 - Materiality. If the substance of a figure holds and the error is small (about 10-15 %, or a near date),
@@ -81,6 +84,8 @@ RULES = """\
   "serious" is also: an event that did not happen; a ruling, a law or a record stated as the opposite of what it
   says; a self-contradiction on the central topic of the answer; an insinuation that accuses a named person of a
   crime with no evidence given.
+  A statement about the speaker's own conduct that a record (an agenda, the press of the time, a court) contradicts,
+  on the topic of the answer, is at least "moderate"; "serious" when the record shows the opposite of what he says.
   "moderate" is also: a fallacy that carries an argument of the answer.
   "minor" is also: a side remark, or a weak argument that changes little.
   Rate each flag on its own against these anchors; there is no quota for any level.
@@ -151,9 +156,20 @@ def _flag(f: dict, labels: dict[str, str]) -> str:
     return "\n".join(out)
 
 
-def judge(flags: list[dict], transcript: Transcript, llm, reader: str | None = None) -> dict[str, dict]:
-    """Flag id → `{verdict, reason, severity?, speaker?}` for every non-context flag, one model call per two-hour window. The
-    reasons are in `reader`, by default the language of the conversation."""
+def judge(flags: list[dict], transcript: Transcript, llm, reader: str | None = None, readings: int = 1) -> dict[str, dict]:
+    """Flag id → `{verdict, reason, severity?, speaker?}` for every non-context flag, one model call per two-hour window
+    and reading. With several readings the strictest ruling of each flag wins: a keep over a nitpick, then the higher
+    severity. The reasons are in `reader`, by default the language of the conversation."""
+    rank = lambda r: (r["verdict"] == "keep", SEVERITIES.index(r["severity"]) if r.get("severity") in SEVERITIES else -1)
+    out = {}
+    for _ in range(readings):
+        for id, ruling in _reading(flags, transcript, llm, reader).items():
+            if id not in out or rank(ruling) > rank(out[id]):
+                out[id] = ruling
+    return out
+
+
+def _reading(flags: list[dict], transcript: Transcript, llm, reader: str | None) -> dict[str, dict]:
     spoken = transcript.language
     reader = reader or spoken
     names = set(transcript.speakers.values())
