@@ -20,23 +20,24 @@ def transcript() -> Transcript:
                       speakers={HOST: "Presentadora", GUEST: "Ana Ruiz"})
 
 
-def flag(t, quote, type, label, speaker="Ana Ruiz", **extra):
+def found_flag(t, quote, type, label, speaker="Ana Ruiz", **extra):
     return {"id": f"{label}-{t:.1f}", "t": float(t), "speaker": speaker, "quote": quote, "type": type,
             "label": label, "reason": f"Motivo inventado de {label}.", "confidence": 0.9} | extra
 
 
 FLAGS = [
-    flag(0, REPROACH, "fallacy", "ad_hominem"),  # the host's words, given to the guest
-    flag(30, FALLACY, "fallacy", "ad_hominem"),
-    flag(60, FALSE, "inaccuracy", "false"),
-    flag(120, DISPUTED, "inaccuracy", "disputed"),
-    flag(210, LATER, "contradiction", "self", related={"t": 150.0, "quote": EARLIER}),
+    found_flag(0, REPROACH, "fallacy", "ad_hominem"),  # the host's words, given to the guest
+    found_flag(30, FALLACY, "fallacy", "ad_hominem"),
+    found_flag(60, FALSE, "inaccuracy", "false"),
+    found_flag(120, DISPUTED, "inaccuracy", "disputed"),
+    found_flag(210, LATER, "contradiction", "self", related={"t": 150.0, "quote": EARLIER}),
 ]
 REPROACH_ID, FALLACY_ID, FALSE_ID, DISPUTED_ID, SELF_ID = (f["id"] for f in FLAGS)
 
 
 class FakeJudge:
-    """Answers each judge reading with `rulings`: flag id → (verdict, reason, speaker)."""
+    """Answers each judge reading with `rulings`: flag id → (verdict, reason, speaker) or (verdict, reason, speaker,
+    severity). Records the prompt and the schema of each reading."""
 
     def __init__(self, rulings):
         self.rulings = rulings
@@ -44,5 +45,5 @@ class FakeJudge:
 
     def complete(self, prompt, schema, tools=()):
         self.calls.append({"prompt": str(prompt), "schema": schema})
-        return {"rulings": [{"id": i, "verdict": v, "reason": r, "speaker": s}
-                            for i, (v, r, s) in self.rulings.items()]}
+        return {"rulings": [{"id": i} | dict(zip(("verdict", "reason", "speaker", "severity"), ruling))
+                            for i, ruling in self.rulings.items()]}

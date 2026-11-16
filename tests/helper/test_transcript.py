@@ -14,28 +14,20 @@ from fact_checker import server
 from fact_checker.adapters.whisper import Whisper
 from fact_checker.adapters.youtube import YouTube
 from fact_checker.core import scheduler, summary
-from fact_checker.core.flags import Segment, Transcript
 from fact_checker.server import run_analysis
 from first_part_fakes import (
-    FakeModel,
-    FakeTranscript,
+    CAPTIONS,
     flag_file,
     GUEST_QUOTE,
+    GuessingModel,
     HOST_QUOTE,
     LATE_QUOTE,
     SlowVoices,
     speaker_of,
     wait_for,
 )
-from roles_fakes import (
-    FakeModel as FakeModel_roles,
-    FakeTranscript as FakeTranscript_roles,
-    FakeVoices,
-    GUEST,
-    HOST,
-    NOISE,
-    TITLE,
-)
+from roles_fakes import GUEST, HOST, NamingModel, NOISE, TITLE, TITLED, TURNS
+from video_fakes import FakeTranscript, FakeVoices, spoken
 
 
 # S5 A2 · A card names the voice that said its words
@@ -51,23 +43,8 @@ from roles_fakes import (
 # the guest: one on the host's words, one on words that cross from the host to the guest; a temporary
 # helper home.
 
-HOST_s5a2 = "Mucha gente dice que la oposición no tiene autoridad para hablar de vivienda"
-GUEST_s5a2 = "Nosotros hemos construido más viviendas que ningún otro gobierno"
-
-
-def words(start, text):
-    return [Segment(t=start + i * 0.5, text=w) for i, w in enumerate(text.split())]
-
-
-class FakeTranscript_s5a2:
-    def fetch(self, video_id):
-        return Transcript(segments=words(0, HOST_s5a2) + words(10, GUEST_s5a2), published_at="2026-11-10")
-
-
-class FakeVoices_s5a2:
-    def turns(self, video_id):
-        return [{"start": 0.0, "end": 9.8, "speaker": "SPEAKER_00"},
-                {"start": 9.9, "end": 20.0, "speaker": "SPEAKER_01"}]
+HOST_WORDS = "Mucha gente dice que la oposición no tiene autoridad para hablar de vivienda"
+GUEST_WORDS = "Nosotros hemos construido más viviendas que ningún otro gobierno"
 
 
 def flag(quote):
@@ -87,7 +64,10 @@ class FakeClaude:
 
 
 def test_speaker_from_voice(tmp_path):
-    run_analysis("voices", 0, transcript=FakeTranscript_s5a2(), llm=FakeClaude(), home=tmp_path, voices=FakeVoices_s5a2())
+    captions = FakeTranscript(spoken([(0, HOST_WORDS), (10, GUEST_WORDS)]))
+    voices = FakeVoices([{"start": 0.0, "end": 9.8, "speaker": "SPEAKER_00"},
+                         {"start": 9.9, "end": 20.0, "speaker": "SPEAKER_01"}])
+    run_analysis("voices", 0, transcript=captions, llm=FakeClaude(), home=tmp_path, voices=voices)
     data = json.loads((tmp_path / "videos" / "voices.json").read_text())
     flags = data["flags"]
 
@@ -138,7 +118,7 @@ class Audio:
         raise RuntimeError("no audio in this test")
 
 
-class FakeClaude_s12a1:
+class AudioQuoteModel:
     def complete(self, prompt, schema, tools=()):
         if "verdicts" in schema["properties"]:
             return {"verdicts": []}
@@ -165,7 +145,7 @@ def test_audio_when_no_captions(tmp_path, monkeypatch):
     youtube, audio, home = helper(tmp_path, monkeypatch)
 
     # Case 1 · no Spanish captions → the fallacy quotes the Whisper words, at the second of the first word
-    run_analysis("uncaptioned", 0, transcript=youtube, llm=FakeClaude_s12a1(), home=home)
+    run_analysis("uncaptioned", 0, transcript=youtube, llm=AudioQuoteModel(), home=home)
     data = json.loads((home / "videos" / "uncaptioned.json").read_text())
     assert data["status"] == "done", data
     assert [(f["label"], f["quote"]) for f in data["flags"]] == [
@@ -176,7 +156,7 @@ def test_audio_when_no_captions(tmp_path, monkeypatch):
     assert data["published_at"] == "2024-03-15"
 
     # Case 3 · Spanish captions exist → the audio is not requested and the captions are analysed
-    run_analysis("captioned", 0, transcript=youtube, llm=FakeClaude_s12a1(), home=home)
+    run_analysis("captioned", 0, transcript=youtube, llm=AudioQuoteModel(), home=home)
     data = json.loads((home / "videos" / "captioned.json").read_text())
     assert data["status"] == "done", data
     assert audio.requests == []
@@ -203,7 +183,7 @@ def test_audio_when_no_captions(tmp_path, monkeypatch):
 WORDS = Path(__file__).parents[1] / "fakes" / "whisper" / "transcribe.json"
 QUOTE = "La oposición no tiene autoridad para hablar."
 
-FAKE_YTDLP_s21a2 = """\
+NO_CAPTIONS_YTDLP = """\
 print("20240315")
 """
 FAKE_UV = f"""\
@@ -229,7 +209,7 @@ print(json.dumps({{"type": "result", "subtype": "success", "is_error": False, "a
 def fake_bin(tmp_path, with_uv: bool) -> Path:
     bin_dir = tmp_path / ("bin-uv" if with_uv else "bin")
     bin_dir.mkdir()
-    for name, code in {"yt-dlp": FAKE_YTDLP_s21a2, "claude": FAKE_CLAUDE, **({"uv": FAKE_UV} if with_uv else {})}.items():
+    for name, code in {"yt-dlp": NO_CAPTIONS_YTDLP, "claude": FAKE_CLAUDE, **({"uv": FAKE_UV} if with_uv else {})}.items():
         (bin_dir / name).write_text(f"#!{sys.executable}\n{code}")
         (bin_dir / name).chmod(0o755)
     return bin_dir
@@ -296,10 +276,10 @@ def test_no_engine(tmp_path, monkeypatch):
 # helper home.
 
 def test_first_part_first(tmp_path):
-    voices, model, viewer = SlowVoices(5), FakeModel(), scheduler.Viewer(0)
+    voices, model, viewer = SlowVoices(5), GuessingModel(), scheduler.Viewer(0)
     began = time.monotonic()
     run = threading.Thread(target=run_analysis, args=("primero1", 0), daemon=True,
-                           kwargs={"transcript": FakeTranscript(), "llm": model, "home": tmp_path, "voices": voices,
+                           kwargs={"transcript": CAPTIONS, "llm": model, "home": tmp_path, "voices": voices,
                                    "viewer": viewer})
     run.start()
 
@@ -342,9 +322,9 @@ def test_first_part_first(tmp_path):
 # helper home per run.
 
 def test_names_corrected(tmp_path):
-    voices, model = SlowVoices(4), FakeModel()
+    voices, model = SlowVoices(4), GuessingModel()
     run = threading.Thread(target=run_analysis, args=("nombres1", 0), daemon=True,
-                           kwargs={"transcript": FakeTranscript(), "llm": model, "home": tmp_path / "voices",
+                           kwargs={"transcript": CAPTIONS, "llm": model, "home": tmp_path / "voices",
                                    "voices": voices})
     run.start()
 
@@ -363,8 +343,8 @@ def test_names_corrected(tmp_path):
     assert data["status"] == "done" and data["speakers"] == {"SPEAKER_00": "Presentadora", "SPEAKER_01": "Invitado"}
 
     # Case 3 · no speaker separation → the flags keep the names from the text; no speakers reading
-    model = FakeModel()
-    run_analysis("nombres1", 0, transcript=FakeTranscript(), llm=model, home=tmp_path / "text")
+    model = GuessingModel()
+    run_analysis("nombres1", 0, transcript=CAPTIONS, llm=model, home=tmp_path / "text")
     data = flag_file(tmp_path / "text", "nombres1")
     assert speaker_of(data, HOST_QUOTE) == "Invitado" and model.speakers_readings == 0, \
         f"FAIL S31 A2 · without voices: {data['flags']}"
@@ -388,15 +368,15 @@ NAMED = {HOST: ("Presentador", "host", "Presentador"), GUEST: ("Ana Ruiz (invita
          NOISE: ("Técnico", "guest", "Técnico")}
 
 
-def flag_s33a1(id, t, speaker):
+def marked_flag(id, t, speaker):
     return {"id": id, "t": t, "speaker": speaker, "quote": f"frase inventada {id}", "type": "fallacy",
             "label": "ad_hominem", "reason": "Motivo inventado.", "confidence": 0.9, "related": None, "sources": [],
             "note": None, "on_player": True, "mark": "correct"}
 
 
 def test_people_in_flag_file(tmp_path):
-    model = FakeModel_roles(NAMED)
-    run_analysis("entrevista", 0, transcript=FakeTranscript_roles(), llm=model, home=tmp_path, voices=FakeVoices())
+    model = NamingModel(NAMED)
+    run_analysis("entrevista", 0, transcript=TITLED, llm=model, home=tmp_path, voices=FakeVoices(TURNS))
     data = json.loads((tmp_path / "videos" / "entrevista.json").read_text())
     people = data.get("people")
     assert people, f"FAIL S33 A1 · the flag file has no people: {sorted(data)}"
@@ -420,10 +400,11 @@ def test_people_in_flag_file(tmp_path):
     assert TITLE in model.readings[0]["prompt"], "FAIL S33 A1 · the speakers reading does not see the video title"
 
     # Case 5 · no voice separation → no people in the file, and a card for every speaker
-    run_analysis("sinvoces", 0, transcript=FakeTranscript_roles(), llm=FakeModel_roles(NAMED), home=tmp_path)
+    run_analysis("sinvoces", 0, transcript=TITLED, llm=NamingModel(NAMED), home=tmp_path)
     plain = json.loads((tmp_path / "videos" / "sinvoces.json").read_text())
     assert "people" not in plain, f"FAIL S33 A1 · a file with no voices has people: {plain['people']}"
-    shown = summary.guests(plain | {"flags": [flag_s33a1("a-10.0", 10.0, "Presentador"), flag_s33a1("b-20.0", 20.0, "Ana Ruiz")]})
+    shown = summary.guests(plain | {"flags": [marked_flag("a-10.0", 10.0, "Presentador"),
+                                              marked_flag("b-20.0", 20.0, "Ana Ruiz")]})
     assert shown == ["Presentador", "Ana Ruiz"], f"FAIL S33 A1 · the export gives cards for {shown}"
     print("PASS S33 A1 · Each voice gets a role, a person and its seconds of speech")
 

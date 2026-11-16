@@ -349,12 +349,7 @@ describe("S30 A3 · The player says \"signals, not verdicts\" and what an analys
   }
 
   describe("S30 A3 · signals, not verdicts, and the spend line", () => {
-    // Case 1 · a card → its confidence "90%"
-    it("Case 1 · the card shows 90%", async () => {
-      await watch("es-ES", FILE);
-      expect(document.querySelector(".fc-card")!.textContent).toContain("90%");
-      vi.clearAllTimers();
-    });
+    // Case 1 · a card → its confidence "90%": S1 A4 Case 2 (card.test.ts)
 
     // Case 2 · the side panel → its foot says "Señales automáticas, no veredictos"; in English, the English line
     it("Case 2 · the panel foot line in Spanish and in English", async () => {

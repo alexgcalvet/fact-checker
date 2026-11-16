@@ -27,8 +27,10 @@ from machine_fakes import (
     calls,
     doctor_check,
     FAKE_CODEX,
+    FAKE_RECORDER,
     Foreign,
     health,
+    HELPER_SRC,
     helper_check,
     listening,
     machine,
@@ -53,18 +55,12 @@ from machine_fakes import (
 # starts the helper's HTTP server on it (S38: doctor knows the helper by its /health). The last case installs the package for real with `uv tool install` into temporary
 # tool folders.
 
-HELPER_SRC_s21a1 = Path(__file__).parents[2] / "src" / "helper"
 REAL_HOME = Path.home()
 
 FAKE_CLAUDE = """\
 import json, os, sys
 if sys.argv[1:3] == ["auth", "status"]:
     print(json.dumps({"loggedIn": os.environ.get("FAKE_CLAUDE_LOGGED") == "1"}))
-"""
-FAKE_RECORDER = """\
-import json, os, sys
-with open(os.environ["FAKE_LOG"], "a") as f:
-    f.write(json.dumps([os.path.basename(sys.argv[0])] + sys.argv[1:]) + "\\n")
 """
 
 
@@ -75,7 +71,7 @@ def free_port() -> int:
 
 
 @pytest.fixture
-def machine_s21a1(tmp_path, monkeypatch):
+def machine_with_tools(tmp_path, monkeypatch):
     """A machine with every tool; a test removes one with `missing`."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -113,89 +109,79 @@ def machine_s21a1(tmp_path, monkeypatch):
     return Machine()
 
 
-def run_s21a1(monkeypatch, capsys, *args) -> tuple[int, list[str]]:
-    monkeypatch.setattr(sys, "argv", ["fact-checker", *args])
-    try:
-        cli.main()
-        code = 0
-    except SystemExit as end:
-        code = end.code or 0
-    return code, capsys.readouterr().out.splitlines()
-
-
 def line(lines, start):
     found = [x for x in lines if x.startswith(start)]
     assert len(found) == 1, f"FAIL S21 A1 · one line starting {start!r}: {lines}"
     return found[0]
 
 
-def test_setup_and_doctor(machine_s21a1, monkeypatch, capsys, tmp_path):
+def test_setup_and_doctor(machine_with_tools, monkeypatch, capsys, tmp_path):
     real_agent = REAL_HOME / "Library" / "LaunchAgents" / "com.fact-checker.helper.plist"
     real_unit = REAL_HOME / ".config" / "systemd" / "user" / "fact-checker.service"
     before = (real_agent.exists(), real_unit.exists())
-    unit = machine_s21a1.user / ".config" / "systemd" / "user" / "fact-checker.service"
-    agent = machine_s21a1.user / "Library" / "LaunchAgents" / "com.fact-checker.helper.plist"
+    unit = machine_with_tools.user / ".config" / "systemd" / "user" / "fact-checker.service"
+    agent = machine_with_tools.user / "Library" / "LaunchAgents" / "com.fact-checker.helper.plist"
 
     # Case 1 · Linux without yt-dlp, setup → one line with the fix, exit 1, no unit, no systemctl call
-    machine_s21a1.system("Linux")
-    machine_s21a1.missing("yt-dlp")
-    code, out = run_s21a1(monkeypatch, capsys, "setup", "--port", str(machine_s21a1.port))
+    machine_with_tools.system("Linux")
+    machine_with_tools.missing("yt-dlp")
+    code, out = run(monkeypatch, capsys, "setup", "--port", str(machine_with_tools.port))
     assert code == 1, f"FAIL S21 A1 · setup exit {code} with yt-dlp missing"
     assert line(out, "yt-dlp:") == "yt-dlp: missing · fix: uv tool install yt-dlp"
-    assert not unit.exists() and machine_s21a1.calls() == [], "FAIL S21 A1 · setup installed with a tool missing"
+    assert not unit.exists() and machine_with_tools.calls() == [], "FAIL S21 A1 · setup installed with a tool missing"
 
     # Case 2 · Linux with every tool, setup → a systemd user unit that serves on the port at login, enabled now
-    (machine_s21a1.bin / "yt-dlp").write_text(f"#!{sys.executable}\n")
-    (machine_s21a1.bin / "yt-dlp").chmod(0o755)
-    code, out = run_s21a1(monkeypatch, capsys, "setup", "--port", str(machine_s21a1.port))
+    (machine_with_tools.bin / "yt-dlp").write_text(f"#!{sys.executable}\n")
+    (machine_with_tools.bin / "yt-dlp").chmod(0o755)
+    code, out = run(monkeypatch, capsys, "setup", "--port", str(machine_with_tools.port))
     assert code == 0, f"FAIL S21 A1 · setup exit {code}: {out}"
     text = unit.read_text()
     exec_start = next((x for x in text.splitlines() if x.startswith("ExecStart=")), "")
-    assert exec_start.endswith(f"serve --port {machine_s21a1.port}"), f"FAIL S21 A1 · ExecStart: {text}"
-    assert f"Environment=PATH={machine_s21a1.bin}" in text, f"FAIL S21 A1 · the unit has no PATH: {text}"
+    assert exec_start.endswith(f"serve --port {machine_with_tools.port}"), f"FAIL S21 A1 · ExecStart: {text}"
+    assert f"Environment=PATH={machine_with_tools.bin}" in text, f"FAIL S21 A1 · the unit has no PATH: {text}"
     assert "WantedBy=default.target" in text, f"FAIL S21 A1 · the unit does not start at login: {text}"
-    assert ["systemctl", "--user", "daemon-reload"] in machine_s21a1.calls(), f"FAIL S21 A1 · {machine_s21a1.calls()}"
-    assert ["systemctl", "--user", "enable", "--now", "fact-checker.service"] in machine_s21a1.calls(), \
-        f"FAIL S21 A1 · {machine_s21a1.calls()}"
+    assert ["systemctl", "--user", "daemon-reload"] in machine_with_tools.calls(), f"FAIL S21 A1 · {machine_with_tools.calls()}"
+    assert ["systemctl", "--user", "enable", "--now", "fact-checker.service"] in machine_with_tools.calls(), \
+        f"FAIL S21 A1 · {machine_with_tools.calls()}"
 
     # Case 3 · macOS, setup → a launchd agent that serves on the port at login and stays up, loaded now
-    machine_s21a1.system("Darwin")
-    code, out = run_s21a1(monkeypatch, capsys, "setup", "--port", str(machine_s21a1.port))
+    machine_with_tools.system("Darwin")
+    code, out = run(monkeypatch, capsys, "setup", "--port", str(machine_with_tools.port))
     assert code == 0, f"FAIL S21 A1 · setup exit {code} on macOS: {out}"
     plist = plistlib.loads(agent.read_bytes())
-    assert plist["ProgramArguments"][-3:] == ["serve", "--port", str(machine_s21a1.port)], \
+    assert plist["ProgramArguments"][-3:] == ["serve", "--port", str(machine_with_tools.port)], \
         f"FAIL S21 A1 · ProgramArguments {plist['ProgramArguments']}"
     assert plist["RunAtLoad"] is True and plist["KeepAlive"] == {"SuccessfulExit": False}, \
         "FAIL S21 A1 · the agent does not stay up"
-    assert plist["EnvironmentVariables"]["PATH"] == str(machine_s21a1.bin), "FAIL S21 A1 · the agent has no PATH"
-    assert ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(agent)] in machine_s21a1.calls(), \
-        f"FAIL S21 A1 · {machine_s21a1.calls()}"
+    assert plist["EnvironmentVariables"]["PATH"] == str(machine_with_tools.bin), "FAIL S21 A1 · the agent has no PATH"
+    assert ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(agent)] in machine_with_tools.calls(), \
+        f"FAIL S21 A1 · {machine_with_tools.calls()}"
 
     # Case 4 · doctor, Claude logged out, no helper, no token → one line each with its fix, exit 1
-    machine_s21a1.system("Linux")
+    machine_with_tools.system("Linux")
     monkeypatch.setenv("FAKE_CLAUDE_LOGGED", "0")
-    machine_s21a1.missing("chromium")
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", str(machine_s21a1.port))
+    machine_with_tools.missing("chromium")
+    code, out = run(monkeypatch, capsys, "doctor", "--port", str(machine_with_tools.port))
     assert code == 1, f"FAIL S21 A1 · doctor exit {code} with problems"
     assert line(out, "claude:") == "claude: not logged in · fix: claude auth login"
     assert line(out, "chrome:").startswith("chrome: missing · fix: "), f"FAIL S21 A1 · {out}"
-    assert line(out, "helper:") == f"helper: not running on port {machine_s21a1.port} · fix: fact-checker setup"
+    assert line(out, "helper:") == f"helper: not running on port {machine_with_tools.port} · fix: fact-checker setup"
     assert line(out, "speaker separation:").startswith("speaker separation: off (optional)"), f"FAIL S21 A1 · {out}"
     assert line(out, "speech to text:") == "speech to text: faster-whisper"
 
     # Case 5 · doctor, everything there, the token in the helper home's .env, a helper on the port → exit 0
     monkeypatch.setenv("FAKE_CLAUDE_LOGGED", "1")
-    (machine_s21a1.bin / "chromium").write_text(f"#!{sys.executable}\n")
-    (machine_s21a1.bin / "chromium").chmod(0o755)
-    (machine_s21a1.helper / ".env").write_text("HF_TOKEN=invented\n")
-    server = ThreadingHTTPServer(("127.0.0.1", machine_s21a1.port), handler(Helper(machine_s21a1.helper)))
+    (machine_with_tools.bin / "chromium").write_text(f"#!{sys.executable}\n")
+    (machine_with_tools.bin / "chromium").chmod(0o755)
+    (machine_with_tools.helper / ".env").write_text("HF_TOKEN=invented\n")
+    server = ThreadingHTTPServer(("127.0.0.1", machine_with_tools.port), handler(Helper(machine_with_tools.helper)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", str(machine_s21a1.port))
+        code, out = run(monkeypatch, capsys, "doctor", "--port", str(machine_with_tools.port))
     finally:
         server.shutdown()
     assert code == 0, f"FAIL S21 A1 · doctor exit {code}: {out}"
-    assert line(out, "helper:") == f"helper: running on port {machine_s21a1.port}"
+    assert line(out, "helper:") == f"helper: running on port {machine_with_tools.port}"
     assert line(out, "speaker separation:") == "speaker separation: on"
     assert "HF_TOKEN" not in os.environ, "FAIL S21 A1 · doctor leaked the token into the environment"
     assert (real_agent.exists(), real_unit.exists()) == before, "FAIL S21 A1 · setup wrote into the real home"
@@ -208,7 +194,7 @@ def test_uv_tool_install(tmp_path):
     cache = subprocess.run([uv, "cache", "dir"], capture_output=True, text=True).stdout.strip()
     env = os.environ | {"UV_CACHE_DIR": cache, "UV_TOOL_DIR": str(tmp_path / "tools"), "UV_TOOL_BIN_DIR": str(tmp_path / "bin"),
                         "HOME": str(tmp_path), "FACT_CHECKER_HOME": str(tmp_path / "helper")}
-    install = subprocess.run([uv, "tool", "install", "--quiet", str(HELPER_SRC_s21a1)], env=env, capture_output=True, text=True)
+    install = subprocess.run([uv, "tool", "install", "--quiet", str(HELPER_SRC)], env=env, capture_output=True, text=True)
     assert install.returncode == 0, f"FAIL S21 A1 · uv tool install: {install.stderr[-400:]}"
     for name in ("thresholds.json", "summary.html"):
         assert list((tmp_path / "tools").rglob(f"fact_checker/{name}")), f"FAIL S21 A1 · the package lacks {name}"
@@ -235,7 +221,7 @@ def test_uv_tool_install(tmp_path):
 SECRET = "sk-ant-invented-secret-value"
 
 
-class Helper_s22a4(BaseHTTPRequestHandler):
+class RunningHelper(BaseHTTPRequestHandler):
     def do_GET(self):  # S38: doctor knows the helper by its /health
         raw = b'{"app": "fact-checker", "writable": true}' if self.path == "/health" else b""
         self.send_response(200 if raw else 404)
@@ -247,28 +233,40 @@ class Helper_s22a4(BaseHTTPRequestHandler):
         pass
 
 
-def test_doctor_provider(tmp_path, monkeypatch, capsys):
+FAILING_CLI = "import sys\nsys.exit(1)\n"
+
+def linux_machine(tmp_path, monkeypatch, clis: bool = True) -> tuple[Path, Path, ThreadingHTTPServer]:
+    """A Linux machine whose PATH holds only fake `uv`, `yt-dlp`, `ffmpeg` and `chromium` commands, and failing `claude`
+    and `codex` commands with `clis`; a user home (HOME) and a helper home (FACT_CHECKER_HOME); no API key or provider in
+    the environment; and a stand-in for the running helper on a free local port. Returns the folder of the commands,
+    the helper home and the stand-in."""
     bin_dir, user, home = tmp_path / "bin", tmp_path / "user", tmp_path / "helper"
     for folder in (bin_dir, user, home):
         folder.mkdir()
-    for name in ("uv", "yt-dlp", "ffmpeg", "chromium"):
-        (bin_dir / name).write_text(f"#!{sys.executable}\n")
+    for name, code in {"uv": "", "yt-dlp": "", "ffmpeg": "", "chromium": "",
+                       **({"claude": FAILING_CLI, "codex": FAILING_CLI} if clis else {})}.items():
+        (bin_dir / name).write_text(f"#!{sys.executable}\n{code}")
         (bin_dir / name).chmod(0o755)
     monkeypatch.setenv("PATH", str(bin_dir))
     monkeypatch.setenv("HOME", str(user))
     monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
-    for name in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "FACT_CHECK_PROVIDER", "CODEX_BIN", "HF_TOKEN",
-                 "FACT_CHECK_API_KEY"):
+    for name in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CHAT_API_KEY", "HF_TOKEN", "TAVILY_API_KEY",
+                 "FACT_CHECK_PROVIDER", "CODEX_BIN", "FACT_CHECK_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(platform, "system", lambda: "Linux")
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Helper_s22a4)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), RunningHelper)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return bin_dir, home, httpd
+
+
+def test_doctor_provider(tmp_path, monkeypatch, capsys):
+    bin_dir, home, httpd = linux_machine(tmp_path, monkeypatch, clis=False)
     port = str(httpd.server_address[1])
 
     # Case 1 · anthropic with parts = claude-sonnet-5-5 and no key → the provider, the model of each step, the missing
     # key variable with its fix; exit 1; no line about Claude Code
     (home / "config.toml").write_text('provider = "anthropic"\n[models]\nparts = "claude-sonnet-5-5"\n')
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert code == 1, (code, out)
     assert "provider: anthropic" in out, out
     assert ("models: parts claude-sonnet-5-5, verdict claude-opus-5-5, judge claude-opus-5-5, "
@@ -278,7 +276,7 @@ def test_doctor_provider(tmp_path, monkeypatch, capsys):
 
     # Case 2 · the key in the helper's .env → "set", never its value; every check passes
     (home / ".env").write_text(f"ANTHROPIC_API_KEY={SECRET}\n")
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert "ANTHROPIC_API_KEY: set" in out, out
     assert not [x for x in out if SECRET in x], out
     assert code == 0, (code, out)
@@ -286,7 +284,7 @@ def test_doctor_provider(tmp_path, monkeypatch, capsys):
     # Case 3 · openai with key_env = XAI_API_KEY and no key → that variable is named, not OPENAI_API_KEY
     (home / "config.toml").write_text('provider = "openai"\n[openai]\nbase_url = "https://api.x.ai/v1"\n'
                                       'key_env = "XAI_API_KEY"\n')
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert code == 1, (code, out)
     assert f"XAI_API_KEY: missing · fix: add XAI_API_KEY=<key> to {home / '.env'}" in out, out
     assert not [x for x in out if x.startswith("OPENAI_API_KEY")], out
@@ -295,7 +293,7 @@ def test_doctor_provider(tmp_path, monkeypatch, capsys):
     (home / "config.toml").write_text('provider = "codex"\n')
     (bin_dir / "codex").write_text(f"#!{sys.executable}\n")
     (bin_dir / "codex").chmod(0o755)
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert "provider: codex" in out, out
     assert ("models: parts account default, verdict account default, judge account default, "
             "search account default, screen account default") in out, out
@@ -324,33 +322,16 @@ ROUTER = "https://router.huggingface.co/v1"
 MIXED = ('provider = "anthropic"\n'
          f'[roles.parts]\nprovider = "chat"\nbase_url = "{ROUTER}"\nkey_env = "HF_TOKEN"\nmodel = "some-model"\n'
          f'[roles.search]\nprovider = "chat"\nbase_url = "{ROUTER}"\nkey_env = "HF_TOKEN"\nmodel = "some-model"\n')
-FAILING_CLI = "import sys\nsys.exit(1)\n"
 
 
 def test_doctor_roles(tmp_path, monkeypatch, capsys):
-    bin_dir, user, home = tmp_path / "bin", tmp_path / "user", tmp_path / "helper"
-    for folder in (bin_dir, user, home):
-        folder.mkdir()
-    for name in ("uv", "yt-dlp", "ffmpeg", "chromium"):
-        (bin_dir / name).write_text(f"#!{sys.executable}\n")
-        (bin_dir / name).chmod(0o755)
-    for name in ("claude", "codex"):
-        (bin_dir / name).write_text(f"#!{sys.executable}\n{FAILING_CLI}")
-        (bin_dir / name).chmod(0o755)
-    monkeypatch.setenv("PATH", str(bin_dir))
-    monkeypatch.setenv("HOME", str(user))
-    monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
-    for name in (*SECRETS, "OPENAI_API_KEY", "CHAT_API_KEY", "FACT_CHECK_PROVIDER", "CODEX_BIN", "FACT_CHECK_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(platform, "system", lambda: "Linux")
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Helper_s22a4)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    _, home, httpd = linux_machine(tmp_path, monkeypatch)
     port = str(httpd.server_address[1])
 
     # Case 1 · mixed roles and no key → one line per step with its provider, model and address; each missing key once,
     # with its fix; exit 1
     (home / "config.toml").write_text(MIXED)
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert code == 1, (code, out)
     for line in (f"role parts: chat · some-model · {ROUTER}",
                  "role verdict: anthropic · claude-opus-5-5 · https://api.anthropic.com",
@@ -364,7 +345,7 @@ def test_doctor_roles(tmp_path, monkeypatch, capsys):
 
     # Case 2 · the keys in the helper's .env → each "set", never its value; exit 0
     (home / ".env").write_text("".join(f"{k}={v}\n" for k, v in SECRETS.items()))
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     for variable in SECRETS:
         assert f"{variable}: set" in out, (variable, out)
     assert not [x for x in out for secret in SECRETS.values() if secret in x], out
@@ -376,7 +357,7 @@ def test_doctor_roles(tmp_path, monkeypatch, capsys):
     (home / "config.toml").write_text('provider = "chat"\n[models]\nparts = "llama3"\nverdict = "llama3"\n'
                                       'judge = "llama3"\nsearch = "llama3"\n'
                                       '[chat]\nbase_url = "http://localhost:11434/v1"\n')
-    code, out = run_s21a1(monkeypatch, capsys, "doctor", "--port", port)
+    code, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert "role parts: chat · llama3 · http://localhost:11434/v1" in out, out
     assert not [x for x in out if x.startswith("CHAT_API_KEY")], out
     assert f"TAVILY_API_KEY: missing · fix: add TAVILY_API_KEY=<key> to {home / '.env'}" in out, out
@@ -403,7 +384,6 @@ def test_doctor_roles(tmp_path, monkeypatch, capsys):
 # person's helper on 8765–8769.
 
 REPO = Path(__file__).parents[2]
-HELPER_SRC = REPO / "src" / "helper"
 
 FAKE_UV = """\
 import json, os, sys
@@ -429,33 +409,27 @@ open(os.environ["FAKE_LOG"], "a").write(json.dumps(["curl", *sys.argv[1:]]) + "\
 if sys.argv[-1] == "https://astral.sh/uv/install.sh":
     print('mkdir -p "$HOME/.local/bin" && cp "$FAKE_UV" "$HOME/.local/bin/uv" && chmod 755 "$HOME/.local/bin/uv"')
 """
-FAKE_CLAUDE_s25a1 = """\
+LOGGED_IN_CLAUDE = """\
 import json, sys
 if sys.argv[1:3] == ["auth", "status"]:
     print(json.dumps({"loggedIn": True}))
 else:
     sys.exit(1)
 """
-FAKE_RECORDER_s25a1 = """\
-import json, os, sys
-open(os.environ["FAKE_LOG"], "a").write(json.dumps([os.path.basename(sys.argv[0]), *sys.argv[1:]]) + "\\n")
-"""
-
-
 def script(path: Path, code: str) -> None:
     path.write_text(f"#!{sys.executable}\n{code}")
     path.chmod(0o755)
 
 
-def machine_s25a1(tmp_path: Path) -> dict:
+def installer_machine(tmp_path: Path) -> dict:
     fakes, system = tmp_path / "fakes", tmp_path / "system"
     fakes.mkdir()
     system.mkdir()
     for name in ("sh", "dirname", "cp", "chmod", "mkdir"):
         (system / name).symlink_to(shutil.which(name))
-    for name, code in {"curl": FAKE_CURL, "claude": FAKE_CLAUDE_s25a1, "codex": "import sys\nsys.exit(1)\n",
-                       "launchctl": FAKE_RECORDER_s25a1, "systemctl": FAKE_RECORDER_s25a1, "brew": FAKE_RECORDER_s25a1,
-                       "sudo": FAKE_RECORDER_s25a1, "chromium": ""}.items():
+    for name, code in {"curl": FAKE_CURL, "claude": LOGGED_IN_CLAUDE, "codex": FAILING_CLI,
+                       "launchctl": FAKE_RECORDER, "systemctl": FAKE_RECORDER, "brew": FAKE_RECORDER,
+                       "sudo": FAKE_RECORDER, "chromium": ""}.items():
         script(fakes / name, code)
     script(tmp_path / "uv", FAKE_UV)
     (tmp_path / "ffmpeg-from-wheel").write_text("#!/bin/sh\n")
@@ -480,7 +454,7 @@ def files(home: Path) -> dict:
 
 
 def test_installer_twice(tmp_path):
-    env = machine_s25a1(tmp_path)
+    env = installer_machine(tmp_path)
     home = Path(env["HOME"])
     bin_dir = home / ".local" / "bin"
     real = (REAL_HOME / "Library" / "LaunchAgents" / "com.fact-checker.helper.plist",
@@ -546,27 +520,17 @@ def test_package_holds_the_extension(tmp_path):
 # `chromium` exist; `launchctl` and `systemctl` only write their arguments to a log. The system is Linux. Setup uses a
 # free local port, never the person's helper on 8765.
 
-FAKE_CLAUDE_s25a2 = """\
+LOGIN_CLAUDE = """\
 import json, os, sys
 if sys.argv[1:3] != ["auth", "status"]:
     sys.exit(1)
 print(json.dumps({"loggedIn": os.environ.get("FAKE_CLAUDE_LOGGED") == "1"}))
 """
-FAKE_CODEX_s25a2 = """\
-import os, sys
-sys.exit(0 if sys.argv[1:3] == ["login", "status"] and os.environ.get("FAKE_CODEX_LOGGED") == "1" else 1)
-"""
-FAKE_RECORDER_s25a2 = """\
-import json, os, sys
-open(os.environ["FAKE_LOG"], "a").write(json.dumps([os.path.basename(sys.argv[0])] + sys.argv[1:]) + "\\n")
-"""
-
-
 def test_provider_detection(tmp_path, monkeypatch, capsys):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, code in {"claude": FAKE_CLAUDE_s25a2, "codex": FAKE_CODEX_s25a2, "launchctl": FAKE_RECORDER_s25a2,
-                       "systemctl": FAKE_RECORDER_s25a2, "uv": "", "yt-dlp": "", "ffmpeg": "", "chromium": ""}.items():
+    for name, code in {"claude": LOGIN_CLAUDE, "codex": FAKE_CODEX, "launchctl": FAKE_RECORDER,
+                       "systemctl": FAKE_RECORDER, "uv": "", "yt-dlp": "", "ffmpeg": "", "chromium": ""}.items():
         (bin_dir / name).write_text(f"#!{sys.executable}\n{code}")
         (bin_dir / name).chmod(0o755)
     (tmp_path / "user").mkdir()
@@ -648,10 +612,10 @@ EXAMPLE = HELPER_SRC / "fact_checker" / "env.example"
 FIRST, SECOND = "sk-ant-invented-first-1234", "sk-ant-invented-second-5678"
 
 
-def machine_s25a3(tmp_path: Path) -> dict:
+def key_machine(tmp_path: Path) -> dict:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, code in {"claude": "import sys\nsys.exit(1)\n", "codex": "import sys\nsys.exit(1)\n",
+    for name, code in {"claude": FAILING_CLI, "codex": FAILING_CLI,
                        "uv": "", "yt-dlp": "", "ffmpeg": "", "chromium": ""}.items():
         (bin_dir / name).write_text(f"#!{sys.executable}\n{code}")
         (bin_dir / name).chmod(0o755)
@@ -705,7 +669,7 @@ def check(report: dict, name: str) -> dict:
 
 
 def test_key_and_doctor_json(tmp_path):
-    env = machine_s25a3(tmp_path)
+    env = key_machine(tmp_path)
     dotenv = Path(env["FACT_CHECKER_HOME"]) / ".env"
     example_lines = [x for x in EXAMPLE.read_text().splitlines() if "ANTHROPIC_API_KEY" not in x]
 
@@ -816,52 +780,26 @@ def test_agent_guide():
 # (FACT_CHECKER_HOME) with the `config.toml` of each case. A small HTTP server stands for the running helper on a free
 # local port. No API key in the environment.
 
-def run_s29a4(monkeypatch, capsys, *args) -> list[str]:
-    monkeypatch.setattr(sys, "argv", ["fact-checker", *args])
-    try:
-        cli.main()
-    except SystemExit:
-        pass
-    return capsys.readouterr().out.splitlines()
-
-
 def test_doctor_screen(tmp_path, monkeypatch, capsys):
-    bin_dir, user, home = tmp_path / "bin", tmp_path / "user", tmp_path / "helper"
-    for folder in (bin_dir, user, home):
-        folder.mkdir()
-    for name in ("uv", "yt-dlp", "ffmpeg", "chromium"):
-        (bin_dir / name).write_text(f"#!{sys.executable}\n")
-        (bin_dir / name).chmod(0o755)
-    for name in ("claude", "codex"):
-        (bin_dir / name).write_text(f"#!{sys.executable}\n{FAILING_CLI}")
-        (bin_dir / name).chmod(0o755)
-    monkeypatch.setenv("PATH", str(bin_dir))
-    monkeypatch.setenv("HOME", str(user))
-    monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
-    for name in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CHAT_API_KEY", "HF_TOKEN", "TAVILY_API_KEY",
-                 "FACT_CHECK_PROVIDER", "CODEX_BIN", "FACT_CHECK_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(platform, "system", lambda: "Linux")
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Helper_s22a4)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    _, home, httpd = linux_machine(tmp_path, monkeypatch)
     port = str(httpd.server_address[1])
 
     # Case 1 · no settings file → haiku screens the parts and searches the figures; opus does the rest
-    out = run_s29a4(monkeypatch, capsys, "doctor", "--port", port)
+    _, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert "models: parts opus, verdict opus, judge opus, search haiku, screen haiku" in out, \
         f"FAIL S29 A4 · models line {[x for x in out if x.startswith('models')]}"
     assert "role screen: claude · haiku" in out, out
 
     # Case 2 · provider anthropic → claude-haiku-5-5 screens and searches
     (home / "config.toml").write_text('provider = "anthropic"\n')
-    out = run_s29a4(monkeypatch, capsys, "doctor", "--port", port)
+    _, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert ("models: parts claude-opus-5-5, verdict claude-opus-5-5, judge claude-opus-5-5, "
             "search claude-haiku-5-5, screen claude-haiku-5-5") in out, \
         f"FAIL S29 A4 · models line {[x for x in out if x.startswith('models')]}"
 
     # Case 3 · provider chat with only the parts model → the screen uses the parts model
     (home / "config.toml").write_text('provider = "chat"\n[models]\nparts = "llama3"\n')
-    out = run_s29a4(monkeypatch, capsys, "doctor", "--port", port)
+    _, out = run(monkeypatch, capsys, "doctor", "--port", port)
     assert "role screen: chat · llama3 · http://localhost:11434/v1" in out, \
         f"FAIL S29 A4 · role lines {[x for x in out if x.startswith('role')]}"
     httpd.shutdown()

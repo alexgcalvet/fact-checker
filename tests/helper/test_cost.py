@@ -1,7 +1,6 @@
 """The cost: what each reading logs about its tokens, cost and time."""
 import json
 import os
-import stat
 import sys
 import threading
 
@@ -9,10 +8,12 @@ from pytest import approx
 
 from fact_checker import analyses, server
 from fact_checker.adapters.llm_claude_cli import ClaudeCLI
-from fact_checker.core.flags import Prompt, Segment, Session, Transcript
+from fact_checker.core.flags import Prompt, Session
 from fact_checker.core.prices import cost
 from fact_checker.server import run_analysis
-from first_part_fakes import FakeModel, FakeTranscript, flag_file, PART_S, wait_for
+from first_part_fakes import CAPTIONS, flag_file, GuessingModel, PART_S, wait_for
+from interview_fakes import FALSE, INE, ONE_PART, SECOND
+from video_fakes import fake_video
 
 
 # S17 A1 · Every Claude reading logs its tokens and cost
@@ -26,17 +27,6 @@ from first_part_fakes import FakeModel, FakeTranscript, flag_file, PART_S, wait_
 # YouTube that returns these captions, a fake Fact Check Tools API that finds nothing and no voices. The `claude` command
 # is a fake on PATH: it answers by the JSON schema it gets (part, search, verdict or judge) as `claude -p
 # --output-format json` does, each with its own invented token counts and `total_cost_usd`. A temporary helper home.
-
-HOST, GUEST = "SPEAKER_00", "SPEAKER_01"
-FALSE = "el paro bajó a la mitad en un año"
-LINES = [
-    (0, GUEST, f"Mire {FALSE} y eso lo cambia todo"),
-    (20, HOST, "Muchas gracias por venir y buenas noches"),
-]
-WORDS = LINES[0][2].split()
-SECOND = WORDS.index(FALSE.split()[0]) * 0.5
-INE = {"publisher": "INE", "url": "https://www.ine.es/paro", "date": "2026-10-01"}
-
 
 def usage(created, read, output):
     return {"input_tokens": 3, "cache_creation_input_tokens": created, "cache_read_input_tokens": read,
@@ -73,37 +63,16 @@ print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "ap
 """
 
 
-class FakeYouTube:
-    def __init__(self, *args):
-        pass
-
-    def fetch(self, video_id):
-        segments = [Segment(t=start + i * 0.5, text=w, speaker=voice)
-                    for start, voice, text in LINES for i, w in enumerate(text.split())]
-        return Transcript(segments=segments, published_at="2026-11-10", speakers={HOST: "Presentadora", GUEST: "Invitado"})
-
-
-class NoPublishedChecks:
-    def __init__(self, key):
-        pass
-
-    def search(self, query, language):
-        return []
-
-
 def test_cost_log(tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     fake = bin_dir / "claude"
     fake.write_text(f"#!{sys.executable}\n{FAKE_CLAUDE}")
-    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    fake.chmod(0o755)
     (tmp_path / "readings.json").write_text(json.dumps(READINGS))
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_CLAUDE_READINGS", str(tmp_path / "readings.json"))
-    monkeypatch.setenv("FACT_CHECK_API_KEY", "invented")
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.setattr(server, "YouTube", FakeYouTube)
-    monkeypatch.setattr(server, "GoogleFactCheck", NoPublishedChecks)
+    fake_video(monkeypatch, ONE_PART)
     home = tmp_path / "home"
     home.mkdir()
     (home / "config.toml").write_text("screen = false\n")  # S29: no screen readings here
@@ -149,7 +118,7 @@ class NoCaptions:
 
 def test_first_flags_logged(tmp_path):
     run = threading.Thread(target=run_analysis, args=("tiempo01", 0), daemon=True,
-                           kwargs={"transcript": FakeTranscript(), "llm": FakeModel(), "home": tmp_path / "one"})
+                           kwargs={"transcript": CAPTIONS, "llm": GuessingModel(), "home": tmp_path / "one"})
     run.start()
 
     # Case 1 · the first part is written → the flag file holds first_flags_s, at least one part reading and under 2 s
@@ -164,7 +133,7 @@ def test_first_flags_logged(tmp_path):
     assert "first_flags_s" not in analyses.strip(data), "FAIL S31 A4 · the shared copy carries first_flags_s"
 
     # Case 3 · the captions cannot be fetched → the analysis stops with no first_flags_s
-    run_analysis("tiempo01", 0, transcript=NoCaptions(), llm=FakeModel(), home=tmp_path / "none")
+    run_analysis("tiempo01", 0, transcript=NoCaptions(), llm=GuessingModel(), home=tmp_path / "none")
     data = flag_file(tmp_path / "none", "tiempo01")
     assert data["status"] == "stopped" and "first_flags_s" not in data, data
     print("PASS S31 A4 · The time to the first part is logged")
