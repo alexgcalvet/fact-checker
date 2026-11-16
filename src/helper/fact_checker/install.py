@@ -328,7 +328,10 @@ def setup(port: int | None, name: str | None = None) -> int:
         domain = f"gui/{os.getuid()}"
         subprocess.run(["launchctl", "bootout", f"{domain}/{LABEL}"], capture_output=True)
         stop_helpers(home, tries)
-        subprocess.run(["launchctl", "bootstrap", domain, str(agent)], check=True)
+        started = subprocess.run(["launchctl", "bootstrap", domain, str(agent)], capture_output=True, text=True)
+        if started.returncode:  # such as "Bootstrap failed: 5: Input/output error" in an agent's sandbox
+            print(f"helper: launchd refused it ({started.stderr.strip()}) · fix: {SANDBOX_FIX}")
+            return 1
         print(f"helper: starts at login ({agent})")
     elif system == "Linux":
         unit = Path.home() / ".config" / "systemd" / "user" / UNIT

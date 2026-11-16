@@ -8,7 +8,7 @@ fact-checker is a Chrome extension and a small helper program. The helper reads 
 
 - Speak to the person in their language. Use the **ES** text for Spanish and the **EN** text for English.
 - Do every step yourself. Run every command yourself. Ask the person only when a step shows a message for the person.
-- If a command fails with "Operation not permitted", your sandbox blocked it. Ask the person to approve the command. Then run the same command again outside your sandbox.
+- If a command fails with "Operation not permitted", or setup says "launchd refused it", your sandbox blocked it. Ask the person to approve the command. Then run the same command again outside your sandbox.
 - Never run `fact-checker serve`. `fact-checker setup` starts the helper at every login.
 - Never ask the person to paste a key, a token or a password into the chat.
 - A key goes in only through the helper's key page: on YouTube, ⚙ → Claves (Keys). If the person prefers a terminal, `fact-checker key set <NAME>` also works.
@@ -119,10 +119,24 @@ The helper uses a key from the key page at once. Run `fact-checker doctor --json
 
 ## 5. Load the extension in Chrome
 
-Chrome does not let you do this step. Tell the person this message, with the folder path of step 3.
+Chrome does not let you load the extension. Prepare the step, then tell the person the message, with the folder path of step 3.
 
-> **ES:** Último paso, en Chrome: 1) Escribe chrome://extensions en la barra de direcciones y pulsa Intro. 2) Activa «Modo de desarrollador», arriba a la derecha. 3) Pulsa «Cargar descomprimida» y elige la carpeta <ruta>. La carpeta está oculta: en Mac pulsa Cmd+Mayús+G y pega la ruta; en Linux pulsa Ctrl+L.\
-> **EN:** Last step, in Chrome: 1) Type chrome://extensions in the address bar and press Enter. 2) Turn on "Developer mode", top right. 3) Click "Load unpacked" and choose the folder <path>. The folder is hidden: on a Mac press Cmd+Shift+G and paste the path; on Linux press Ctrl+L.
+- On macOS, copy the path and open the extensions page for the person:
+
+```sh
+printf %s "<path>" | pbcopy
+open -a "Google Chrome" "chrome://extensions"
+```
+
+> **ES (Mac):** Te he abierto la página de extensiones de Chrome y copiado la carpeta. 1) Activa «Modo de desarrollador», arriba a la derecha. 2) Pulsa «Cargar descomprimida». 3) Pulsa Cmd+Mayús+G, pega con Cmd+V, pulsa Intro y luego «Seleccionar». Dime cuando veas fact-checker en la lista.\
+> **EN (Mac):** I opened Chrome's extensions page and copied the folder. 1) Turn on "Developer mode", top right. 2) Click "Load unpacked". 3) Press Cmd+Shift+G, paste with Cmd+V, press Enter, then "Select". Tell me when you see fact-checker in the list.
+
+- On Linux, or if `open` fails, tell the person this message.
+
+> **ES:** Último paso, en Chrome: 1) Escribe chrome://extensions en la barra de direcciones y pulsa Intro. 2) Activa «Modo de desarrollador», arriba a la derecha. 3) Pulsa «Cargar descomprimida» y elige la carpeta <ruta>. La carpeta está oculta: en Mac pulsa Cmd+Mayús+G y pega la ruta; en Linux pulsa Ctrl+L. Dime cuando veas fact-checker en la lista.\
+> **EN:** Last step, in Chrome: 1) Type chrome://extensions in the address bar and press Enter. 2) Turn on "Developer mode", top right. 3) Click "Load unpacked" and choose the folder <path>. The folder is hidden: on a Mac press Cmd+Shift+G and paste the path; on Linux press Ctrl+L. Tell me when you see fact-checker in the list.
+
+- Wait for the person. Do not say that the install is finished before they see fact-checker in the list.
 
 ## 6. Finish
 
