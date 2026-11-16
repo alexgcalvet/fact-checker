@@ -7,7 +7,7 @@
 **A second, critical ear for YouTube.**<br>
 Fallacies, false figures, contradictions and dodged questions, flagged at the second they are said.
 
-[Install in one sentence](INSTALL-AGENT.md) · [How it works](#-how-it-works) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md)
+[Install in one sentence](INSTALL-AGENT.md) · [How it works](#-how-it-works) · [Inside the code](https://alexgcalvet.github.io/fact-checker/) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md)
 
 <sub>AI agent: if a person gave you only this repository's URL, follow <a href="INSTALL-AGENT.md">INSTALL-AGENT.md</a> to install fact-checker.</sub>
 
@@ -18,6 +18,11 @@ Fallacies, false figures, contradictions and dodged questions, flagged at the se
 [![license](https://img.shields.io/badge/license-MIT-E6DCC4)](LICENSE)
 
 </div>
+
+<p align="center">
+  <a href="https://alexgcalvet.github.io/fact-checker/media/demo-es.mp4"><img src="docs/media/demo-es.gif" width="720" alt="fact-checker flags a tu quoque fallacy on a YouTube interview"></a><br>
+  <sub>▶️ <a href="https://alexgcalvet.github.io/fact-checker/media/demo-es.mp4">Watch the 50-second demo with sound</a> (Spanish)</sub>
+</p>
 
 ---
 
@@ -44,6 +49,8 @@ Fallacies, false figures, contradictions and dodged questions, flagged at the se
 4. Flags appear on the player at their second, and in a side panel with every flag of the video.
 
 Your conversations and keys stay on your machine. Nothing is shared unless you say yes.
+
+🗺️ **[Inside the code](https://alexgcalvet.github.io/fact-checker/)**: an interactive page with every component, the flow of one video, the database, and the exact prompts that each model reads.
 
 ## 🚀 Install
 
