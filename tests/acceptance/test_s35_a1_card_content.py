@@ -40,9 +40,9 @@ def test_card_content(tmp_path, monkeypatch):
     for want in ("2 falsos", "2 engañosos", "2 puntualiz", "20 correctos"):
         assert want in card, f"FAIL S35 A1 · the verdict bar lacks {want!r}: {card!r}"
 
-    # Case 3 · counts by severity of every kept flag but questions (figures and rhetoric) → Grave 2, Moderado 4, Leve 2
-    for want in ("Grave 2", "Moderado 4", "Leve 2"):
-        assert want in card, f"FAIL S35 A1 · the severity block lacks {want!r}: {card!r}"
+    # Case 3 · counts by severity of every kept flag but questions (figures and rhetoric), on one line (2026-11-16)
+    # → 2 graves · 4 moderados · 2 leves
+    assert "2 graves · 4 moderados · 2 leves" in card, f"FAIL S35 A1 · the severity line is not 2, 4, 2: {card!r}"
 
     # Case 4 · the devices she repeats and the questions she dodged → "Falso dilema ×3", "Esquivó 2 de 11 preguntas"
     assert "Falso dilema ×3" in card, f"FAIL S35 A1 · no 'Falso dilema ×3': {card!r}"

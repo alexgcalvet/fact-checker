@@ -112,15 +112,15 @@ for family in ("Newsreader", "Host Grotesk", "JetBrains Mono"):
     if family not in loaded:
         print(f"FAIL S35 A3 · the font {family} did not load (loaded: {sorted(loaded)})"); ok = False
 
-# Case 4 · the blocks of the board → plate, Fault and logo on top, then hook, bar, severity and devices side by side,
-# dodged questions, the most serious, footer; the logo in the top right corner
+# Case 4 · the blocks of the board → plate, Fault and logo on top, then hook, bar, severity on one line, devices across
+# the card (2026-11-16), dodged questions, the most serious, footer; the logo in the top right corner
 tops = dict(json.loads(attr("data-blocks")))
 missing = [k for k, t in tops.items() if t < 0]
 if missing:
     print(f"FAIL S35 A3 · blocks missing: {missing}"); ok = False
 else:
-    order = [tops[k] for k in ("hook", "bar", "severity", "dodged", "gravest", "foot")]
-    if order != sorted(order) or tops["severity"] != tops["devices"] or tops["plate"] != 0 or tops["fault"] > tops["hook"]:
+    order = [tops[k] for k in ("hook", "bar", "severity", "devices", "dodged", "gravest", "foot")]
+    if order != sorted(order) or tops["plate"] != 0 or tops["fault"] > tops["hook"]:
         print(f"FAIL S35 A3 · blocks out of the board's order: {tops}"); ok = False
 logo = json.loads(attr("data-logo"))
 if not logo or logo[1] > 120 or logo[2] < 900:

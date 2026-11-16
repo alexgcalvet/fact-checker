@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 import tempfile
 from dataclasses import replace
 from pathlib import Path
@@ -10,11 +11,12 @@ from fact_checker.adapters.diarization import Diarizer
 from fact_checker.adapters.factcheck_google import GoogleFactCheck
 from fact_checker.adapters.whisper import Whisper
 from fact_checker.adapters.youtube import YouTube
-from fact_checker.core import judge, scheduler, score, speakers
+from fact_checker.core import judge, scheduler, score, speakers, summary
 from fact_checker.core.flags import Segment, Transcript
-from fact_checker.store import default_home
+from fact_checker.store import Store, default_home
 
 GOLDEN = Path(__file__).resolve().parents[3] / "tests" / "golden"
+COMPARE_TEMPLATE = Path(__file__).parent / "compare.html"
 TYPES = ("fallacy", "inaccuracy", "contradiction")
 WORD_SECONDS = 0.4
 
@@ -138,6 +140,32 @@ def run_judge(video_id: str, home: Path, against_marks: bool) -> bool:
     return len(ruled_out) >= 6 and len(touched) <= 1
 
 
+def run_compare(video_ids: list[str], series: str | None, home: Path) -> bool:
+    """Writes the comparison of the guests of up to three analysed interviews to compare.png and compare.txt in the
+    current folder, and prints both paths. Else prints in one line why not, and returns False."""
+    store, interviews = Store(home), []
+    for video_id in video_ids:
+        data = store.load(video_id)
+        if not data:
+            print(f"Not analysed: {video_id}", file=sys.stderr)
+            return False
+        marks = store.marks(video_id)
+        data["flags"] = [f | {"mark": marks[f["id"]]} if f["id"] in marks else f for f in data["flags"]]
+        interviews.append(data)
+    c = summary.comparison(interviews, series)
+    if len(c["people"]) > 3:
+        print(f"More than three guests: {', '.join(p['name'] for p in c['people'])}", file=sys.stderr)
+        return False
+    page = summary.compare_page(c, COMPARE_TEMPLATE.read_text(),
+                                {p["video_id"]: server.thumbnail(p["video_id"], home) for p in c["people"]})
+    png, txt = Path("compare.png").resolve(), Path("compare.txt").resolve()
+    png.write_bytes(server.screenshot(page))
+    txt.write_text(summary.compare_alt(c))
+    print(png)
+    print(txt)
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="fact-checker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -161,6 +189,9 @@ def main() -> None:
         else:
             command.add_argument("--provider", choices=["claude", "codex"],
                                  help="the subscription to read with: the agent that installs names itself")
+    comparing = sub.add_parser("compare", help="one card that sets the guests of two or three interviews side by side")
+    comparing.add_argument("video_ids", nargs="+", metavar="video_id")
+    comparing.add_argument("--series", help="the header line; default: the programmes and the months")
     reader = sub.add_parser("provider", help="print the provider in use, or switch to another and restart the helper")
     reader.add_argument("name", nargs="?", choices=["claude", "codex"])
     key = sub.add_parser("key", help="store a key in ~/.fact-checker/.env")
@@ -182,6 +213,10 @@ def main() -> None:
     if args.command in ("setup", "doctor"):
         raise SystemExit(install.setup(args.port, args.provider) if args.command == "setup"
                          else install.doctor(args.port, args.json))
+    if args.command == "compare":
+        if not 2 <= len(args.video_ids) <= 3:
+            parser.error("compare takes two or three video ids")
+        raise SystemExit(0 if run_compare(args.video_ids, args.series, default_home()) else 1)
     if args.command == "provider":
         raise SystemExit(install.set_provider(default_home(), args.name))
 
