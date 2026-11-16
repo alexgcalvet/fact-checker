@@ -14,6 +14,10 @@ MODEL_IDS = {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku": 
 TOKENS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
 
 
+class NoAnswer(RuntimeError):
+    """The reading ended with text instead of the JSON that the schema asks for."""
+
+
 class Busy(RuntimeError):
     pass
 
@@ -32,11 +36,11 @@ class ClaudeCLI:
         self.timeout = timeout
 
     def complete(self, prompt: str, schema: dict, tools: tuple = ()) -> dict:
-        """Retries a 429 (too many requests at once) twice, after 30 s and 60 s."""
+        """Retries a 429 (too many requests at once) or an answer with no JSON twice, after 30 s and 60 s."""
         for wait in RETRY_WAITS:
             try:
                 return self._complete(prompt, schema, tools)
-            except Busy:
+            except (Busy, NoAnswer):
                 time.sleep(wait)
         return self._complete(prompt, schema, tools)
 
@@ -77,6 +81,8 @@ class ClaudeCLI:
             raise Busy("claude -p error: 429")
         if proc.returncode or out.get("is_error"):
             raise RuntimeError(f"claude -p error: {out.get('api_error_status') or out.get('result')}")
+        if "structured_output" not in out:
+            raise NoAnswer(f"claude -p gave no JSON: {str(out.get('result'))[:200]}")
         answer = Answer(out["structured_output"])
         usage = {k: out["usage"][k] for k in TOKENS}
         # A resumed session's total_cost_usd keeps growing with the conversation, far past what its tokens cost (45.56

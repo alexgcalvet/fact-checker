@@ -29,6 +29,8 @@ A real-time conversation analyst: it listens to a live conversation and flags co
 - **Efficient by default.** Pick the simple, efficient approach first. Do not optimise what has not been measured.
 - **Modular, built to evolve.** Think about where the repo is going. Build small modules with one job and clear interfaces, so that parts can be swapped or extended without touching the rest. Adding an adapter, a metric or a provider should be one new file, not an edit across the codebase. Modularity serves iteration, so do not add layers or abstractions before a second use exists.
 <!-- mini-spec:code:end -->
+- **Tests live by part, not by slice.** A slice's acceptance tests stay in `tests/acceptance/`, untouched, while the slice is open. When its last item is done, close it with `/mini-implement <id> promote`. Its tests then move into the suite of their part, where they can be merged or removed. Keep each `S<n> A<n> · <title>` header as a comment on the test that keeps it.
+- **A run on a real interview or a paid model is a measurement, not a test.** Put it in `evals/` with one line in `evals/README.md`. CI never runs it.
 
 ## Documentation
 <!-- mini-spec:documentation:start -->
@@ -65,4 +67,5 @@ A real-time conversation analyst: it listens to a live conversation and flags co
 - `docs/research/`: research reports, one per topic, each starting with its sources. `/explore` and `/rfc` read them, and `/rfc close` archives the ones that the RFC cites
 - `docs/archive/`: finished RFCs and slices, one numbered folder each (`/rfc close` creates them), listed in `docs/archive/README.md`. Read that index to find one. Do not read or edit the archive otherwise
 - `src/`: source code
-- `tests/`: tests; `tests/acceptance/` holds the approved acceptance tests of each slice
+- `tests/`: tests, one suite per part. `tests/helper/test_<part>.py`, `tests/extension/<screen>.test.ts`, `tests/collector/<route>.test.ts`, `tests/contracts/` (one per external system), `tests/support/` (shared fakes and helpers, no test), `tests/fakes/` (recorded answers), `tests/golden/`. `tests/acceptance/` holds only the acceptance tests of the open slices
+- `evals/`: measurements on real interviews or paid models, one line each in `evals/README.md`; CI never runs them

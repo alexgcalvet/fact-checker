@@ -8,7 +8,7 @@ fact-checker = "fact_checker.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["../../tests"]
-pythonpath = ["."]
+pythonpath = [".", "../../tests/support"]
 
 [tool.hatch.build]
 # The built extension: its dist/ matches the repo's ignore rule for build output, which hatch also reads.

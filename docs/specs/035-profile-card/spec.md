@@ -9,9 +9,9 @@ Today "Exportar resumen" gives one image that sets every speaker side by side, w
 
 ## Acceptance
 
-- [X] A1 · The card counts one guest's reviewed claims
-  - **Story:** The person reviews an invented interview where Ana Ruiz makes 26 checked claims and 4 false or misleading flags, all marked correct, and 2 puntualizaciones of the judge that the person leaves unmarked; 2 of the 4 are serious; she uses "Falso dilema" three times and dodges 2 of the 11 questions put to her. The card reads "4 de 26 datos, falsos o engañosos", lists 2 serious, "Falso dilema ×3" and "Esquivó 2 de 11 preguntas", and shows the two serious claims, each with its correction and the name of its source.
-  - **Edge case:** WHEN a flag is not marked or marked unfair THEN it counts nowhere on the card, as on the image today; an unmarked puntualización is the one exception and counts as a puntualización.
+- [X] A1 · The card counts what the judge keeps for one guest
+  - **Story:** The person exports an invented interview where Ana Ruiz makes 26 checked claims; the judge keeps 4 false or misleading flags and rules 2 puntualizaciones, none marked by the person; 2 of the 4 are serious; she uses "Falso dilema" three times and dodges 2 of the 11 questions put to her. The card reads "4 de 26 datos, falsos o engañosos", lists 2 serious among all her kept flags, "Falso dilema ×3" and "Esquivó 2 de 11 preguntas", and shows the two serious claims, each with its correction and the name of its source.
+  - **Edge case:** WHEN the person marks a flag unfair THEN it counts nowhere on the card, even if the judge kept it.
   - **Edge case:** WHEN the person marks a puntualización correct THEN the mark wins, as on the player: it counts under its found verdict, such as false.
   - **Test:** `test_s35_a1_card_content.py`
 - [X] A2 · "Exportar resumen" gives one card per guest
@@ -21,7 +21,7 @@ Today "Exportar resumen" gives one image that sets every speaker side by side, w
   - **Story:** The person runs the render check on the invented interview. It saves the card as a PNG and fails if any text is under 30 px or the page asks the network for a font. The person opens the PNG beside the InterviewCard board of the brand canvas and sees the same plate, Fault, logo and order of blocks.
   - **Test:** `check: bash tests/acceptance/s35-a3-card-render.sh`
 - [X] A4 · A shared analysis gives the same card
-  - **Story:** The person analyses the invented interview with sharing on. A second person opens the same video, gets the shared analysis and exports it. Their card reads the same "4 de 26" and "2 de 11" as the first person's.
+  - **Story:** The person analyses the invented interview with sharing on and marks nothing. A second person opens the same video, gets the shared analysis and exports it, marking nothing either. Both cards count what the judge keeps and read the same "6 de 26" and "Esquivó 3 de 11".
   - **Test:** `test_s35_a4_shared_card.py`
 
 ## Files
@@ -54,7 +54,9 @@ Today "Exportar resumen" gives one image that sets every speaker side by side, w
 - **False or misleading means the labels `false`, `misleading`, `definition_swap` and `plan_as_fact`** (default) — the amber and red families of the player; `disputed` is context.
 - **The verdict bar runs Falso, Engañoso, Puntualización, Correcto** (default) — the panel asked for false first; correct is checked claims minus the rest.
 - **Devices are fallacy and contradiction labels only** (default) — a misleading figure already counts in the hook; no double counting.
-- **The two most serious claims rank by severity, then false before misleading, then confidence** (default).
+- **The card counts what the judge keeps, with no review** (person, 2026-11-15) — the footer says «no revisado por humanos»; rejected: only flags marked correct.
+- **Severity counts every kept flag but questions; the two most serious rank by severity, then false, misleading, rhetoric** (person, 2026-11-15) — an insinuation can be serious too.
+- **The interview line names the programme, not the whole YouTube title; half answers show apart from dodged ones** (person, 2026-11-15).
 - **The mark wins, as on the player** (person, 2026-11-15) — a flag marked correct counts under its found verdict even when the judge ruled it a nitpick; a puntualización is a judge nitpick the person did not mark; so the card matches the side panel.
 
 ## Out of scope

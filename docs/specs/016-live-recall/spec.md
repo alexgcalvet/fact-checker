@@ -19,7 +19,7 @@ On the 1.5-hour interview, a whole-video reading found things the live analysis 
 - [X] A3 · Every extracted figure is logged with what happened to it
   - **Story:** A part of an invented video yields three figures: one becomes a "Dato falso" flag, one checks out as right, and one is cut by the budget. The claims log of the video has three lines with their second, speaker and outcome: `flagged`, `ok` and `unchecked`.
   - **Test:** `tests/acceptance/test_s16_a3_claims_log.py`
-- [ ] A4 · The live analysis catches the high-importance misses on the 1.5-hour interview
+- [X] A4 · The live analysis catches the high-importance misses on the 1.5-hour interview — moved to measurements (`evals/s16-a4-real-recall.sh`), not measured yet
   - **Story:** The person runs the recall check. It analyses the 1.5-hour interview again in a separate helper home (the real flag file and marks stay untouched), and prints how many of the 9 high-importance misses (minute ± 1 and kind, kept in the person's helper home) the new flags hold, and the share of flags the judge drops. It exits 0 with at least 6 of 9 caught and a judge drop share no higher than 47 %, the share before this slice.
   - **Test:** `check: bash tests/acceptance/s16-a4-real-recall.sh`
 

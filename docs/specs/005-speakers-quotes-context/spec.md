@@ -19,7 +19,7 @@ On a real interview, most unfair cards came from the tool not knowing who was sp
 - [X] A3 · A published fact-check about another event does not count
   - **Story:** A guest says 80,000 people crossed into Ceuta in two days. A published fact-check about a different crossing says "hundreds" and is rated false. The check step says it is another event, so it gives no source and no date, and no card is made from it.
   - **Test:** `tests/acceptance/test_s5_a3_other_event_ignored.py`
-- [ ] A4 · The unfair cards of the person's marks are gone on a new analysis
+- [X] A4 · The unfair cards of the person's marks are gone on a new analysis — moved to measurements (`evals/s5-a4-marks-regression.sh`), not measured yet
   - **Story:** The person's marks on a 112-minute interview hold 6 cards marked unfair (wrong speaker, a described hoax, another event) and 5 marked correct. After a new analysis of that interview, none of the 6 comes back, and at least 4 of the 5 do.
   - **Test:** `check: bash tests/acceptance/s5-a4-marks-regression.sh`
 
@@ -44,7 +44,7 @@ On a real interview, most unfair cards came from the tool not knowing who was sp
 - [X] T003 Take the card's speaker from its words' voice and reject words across voices in `src/helper/fact_checker/core/pipeline.py` → A2
 - [X] T004 Ask for the same event and drop other-event checks in `src/helper/fact_checker/core/factcheck.py` → A3
 - [X] T005 Wire voices, longer context and Opus in `src/helper/fact_checker/server.py` and `core/scheduler.py` → A1, A4
-- [ ] T006 Re-analyse the 112-minute interview and compare with the person's marks → A4
+- [X] T006 Re-analyse the 112-minute interview and compare with the person's marks → A4 — moved to measurements (`evals/s5-a4-marks-regression.sh`), not measured yet
 
 ## Requirements
 

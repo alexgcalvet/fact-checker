@@ -151,7 +151,7 @@ flowchart LR
 | 🟡 **CHANGED · S18** `GET /videos/<id>?at=<seconds>` | Return the flag file so far, each flag with its latest `mark` from `marks.jsonl`. 🟢 S18: `at`, the playback second, moves and resumes a running analysis; the extension sends it on every poll. With `lang` and no local file, the helper first asks the collector `GET /analyses/<id>?lang=` (no install id, 5 s) and keeps what it gets with `source: "shared"`; else 404 |
 | `POST /videos/<id>/marks` | Keep the person's mark on one flag: `{flag_id, verdict: correct\|unfair, reason}`; with sharing on, the helper sends it to the collector in the background |
 | `POST /videos/<id>/people` | The person sets the role of one speaker: `{name, role}`; `set_by` becomes `person` |
-| 🟡 **CHANGED · S35** `GET /videos/<id>/summary.png?person=<name>` | The profile card of one guest: 1080×1350, only flags marked `correct`, rendered by headless Chrome in the layout of the CALVET board `InterviewCard`; all text ≥ 30 px |
+| 🟡 **CHANGED · S35** `GET /videos/<id>/summary.png?person=<name>` | The profile card of one guest: 1080×1350, the flags the judge keeps (a mark wins: `unfair` counts nowhere), rendered by headless Chrome in the layout of the CALVET board `InterviewCard`; all text ≥ 30 px |
 | `GET /videos/<id>/summary.txt` | The alt text of the image, at most 1000 characters |
 | `GET /videos/<id>/summary` | A page with the image and its alt text ready to copy; the extension opens it in a new tab |
 | `GET /share` | The sharing answer: `{share: true\|false\|null}`; null until the person answers |
@@ -217,9 +217,23 @@ flowchart LR
 | Helper server | HTTP API above | An integration test with fake ports |
 | Adapters | Their port | A recorded, sanitized response of each system |
 | Extension | Flag file in, DOM out | A test page that mimics the player with a fixed flag file |
-| Collector | Its HTTP routes | vitest with Node's built-in SQLite as the D1 binding (`tests/acceptance/s24_d1_fake.ts`); a contract test against the deployed Worker |
-| Feedback, Shared analyses | `feedback.py`, `analyses.py` functions | a fake collector (`tests/acceptance/s24_fakes.py`, `s28_fakes.py`) |
+| Collector | Its HTTP routes | vitest with Node's built-in SQLite as the D1 binding (`tests/support/d1_fake.ts`); a contract test against the deployed Worker |
+| Feedback, Shared analyses | `feedback.py`, `analyses.py` functions | a fake collector (`tests/support/marks_fakes.py`, `shared_analysis_fakes.py`) |
 | Install | `install.sh`, `setup`, `doctor --json` | fake commands on PATH and a temporary HOME |
+
+Tests live by part, not by slice:
+
+| Folder | Holds |
+|---|---|
+| `tests/acceptance/` | The acceptance tests of an open slice, untouched while it is open |
+| `tests/helper/test_<part>.py` | One suite per part of the helper: reading, fact_check, judge, transcript, providers, cost, setup, sharing, summary, server, eval |
+| `tests/extension/<screen>.test.ts` | One suite per screen: card, panel, strip, settings, start; and the shipped bundle |
+| `tests/collector/<route>.test.ts` | One suite per route: marks, analyses |
+| `tests/contracts/` | One contract test per external system; it says SKIP without credentials |
+| `tests/support/` | Shared fakes and helpers, no test; recorded answers stay in `tests/fakes/` |
+| `evals/` | Runs on real interviews or paid models, with a line each in `evals/README.md`; CI never runs them |
+
+When the last item of a slice is done, `/mini-implement <id> promote` moves its tests into the suite of their part. There they can be merged or removed like any other test. Each test keeps its `S<n> A<n> · <title>` header as a comment.
 
 ## External systems
 
@@ -238,8 +252,8 @@ flowchart LR
 | OpenAI Responses API (`POST <base_url>/responses`) | LLM calls and web search when `provider = "openai"`: OpenAI, or xAI Grok with `base_url = "https://api.x.ai/v1"` | REST, JSON | `Authorization: Bearer <key>`, the key from `key_env` (`OPENAI_API_KEY` by default) in the environment or `<helper home>/.env` | [Responses create](https://developers.openai.com/api/reference/resources/responses/methods/create), [Web search](https://developers.openai.com/api/docs/guides/tools-web-search), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state), [Pricing](https://developers.openai.com/api/docs/pricing), [xAI Responses](https://docs.x.ai/developers/rest-api-reference/inference/responses), read 2026-11-15 | OpenAI / xAI | confirmed (docs; no answer observed: no key in the build session) | docs-built fake: `tests/fakes/openai-api/`, to re-record |
 | Chat Completions API (`POST <base_url>/chat/completions`) | LLM calls with no web search when a role's provider is `chat`: Hugging Face (`https://router.huggingface.co/v1`), OpenRouter, Groq, Together, DeepSeek, Mistral, or a local Ollama (`http://localhost:11434/v1`) or LM Studio | REST, JSON | `Authorization: Bearer <key>`, the key from `key_env` (`CHAT_API_KEY` by default) in the environment or `<helper home>/.env`; no key on a `localhost` address | [Chat create](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create), [HF Inference Providers](https://huggingface.co/docs/inference-providers/index), [Ollama OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility), read 2026-11-15 | OpenAI (format) / each vendor | confirmed (docs; no answer observed: no key in the build session) | docs-built fake: `tests/fakes/chat-api/`, to re-record |
 | Tavily search API (`POST https://api.tavily.com/search`) | Web search results for a `search` role with no web search of its own | REST, JSON | `Authorization: Bearer <key>`, the key from `TAVILY_API_KEY` (or `[tavily] key_env`) in the environment or `<helper home>/.env` | [Search](https://docs.tavily.com/documentation/api-reference/endpoint/search), [Credits](https://docs.tavily.com/documentation/api-credits), read 2026-11-15 | Tavily | confirmed (docs; no answer observed: no key in the build session) | docs-built fake: `tests/fakes/tavily/`, to re-record |
-| Cloudflare Workers + D1 | Hosts the collector and its database | Workers runtime with a D1 binding `DB`; deploy with wrangler | `ADMIN_TOKEN` Worker secret for the owner's routes; the owner's Cloudflare login to deploy | [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) (docs/specs/028-shared-analyses/spec.md), docs/specs/024-shared-feedback/spec.md, [collector README](../src/collector/README.md); `tests/acceptance/test_contract_collector_marks.py` passed against the deployed Worker (2026-11-15) | Cloudflare | confirmed | Node SQLite as D1: `tests/acceptance/s24_d1_fake.ts` |
-| uv installer, PyPI, GitHub archive | `install.sh` installs uv, yt-dlp, ffmpeg (imageio-ffmpeg wheel) and the helper | HTTPS, shell | none | [one-step-install.md](research/one-step-install.md) | Astral, PyPI, GitHub | confirmed | fake `curl` and `uv` in `tests/acceptance/test_s25_a1_installer.py` |
+| Cloudflare Workers + D1 | Hosts the collector and its database | Workers runtime with a D1 binding `DB`; deploy with wrangler | `ADMIN_TOKEN` Worker secret for the owner's routes; the owner's Cloudflare login to deploy | [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) (docs/specs/028-shared-analyses/spec.md), docs/specs/024-shared-feedback/spec.md, [collector README](../src/collector/README.md); `tests/contracts/test_contract_collector_marks.py` passed against the deployed Worker (2026-11-15) | Cloudflare | confirmed | Node SQLite as D1: `tests/support/d1_fake.ts` |
+| uv installer, PyPI, GitHub archive | `install.sh` installs uv, yt-dlp, ffmpeg (imageio-ffmpeg wheel) and the helper | HTTPS, shell | none | [one-step-install.md](research/one-step-install.md) | Astral, PyPI, GitHub | confirmed | fake `curl` and `uv` in `tests/helper/test_setup.py` (S25 A1) |
 | Chrome extension platform | Content script, background worker | Manifest V3 APIs; content script → message → service worker fetch to `127.0.0.1` | `host_permissions: http://127.0.0.1/*`; `storage` for the viewer settings | [external-contracts.md](research/external-contracts.md), spike 2026-11-13 | Google | confirmed | none yet |
 
 | Status | Set by | Effect |
@@ -325,7 +339,7 @@ The helper and the extension run on each person's macOS (Apple silicon or Intel)
 
 | Piece | Used for |
 |---|---|
-| Helper process | `fact-checker serve` on `127.0.0.1:8765` (`--port` to change), started after loading `.env` so that `FACT_CHECK_API_KEY` is set; without it the fact-check step is skipped. 🟢 **NEW · S20** `FACT_CHECK_PROVIDER=codex` reads with Codex CLI instead of Claude Code. `~/.fact-checker/config.toml` picks the provider (`claude`, `codex`, `anthropic`, `openai`) and the model of each role; `fact-checker doctor` prints them and names a missing API key variable |
+| Helper process | `fact-checker serve` on `127.0.0.1:8765` (`--port` to change), started after loading `.env`; without `FACT_CHECK_API_KEY` only the published fact-checks are missing, and the web search still checks every figure. 🟢 **NEW · S20** `FACT_CHECK_PROVIDER=codex` reads with Codex CLI instead of Claude Code. `~/.fact-checker/config.toml` picks the provider (`claude`, `codex`, `anthropic`, `openai`) and the model of each role; `fact-checker doctor` prints them and names a missing API key variable |
 | 🟢 **NEW · S38** Helper ports | `fact-checker serve` without `--port` takes the first free port of 8765–8769 (`FACT_CHECKER_PORT` moves the range, for tests); with all five taken it logs one line and exits 0, and the login agent restarts it only after a failure. The extension finds the helper over the five ports by `/health` and keeps the port. `setup` stops the fact-checker helpers of its home in the range, then waits for `/health`; `doctor` names another program on a port and an agent's sandbox |
 | Install | `uv tool install ./src/helper`; `fact-checker setup` checks claude (logged in), uv, yt-dlp, ffmpeg and Chrome or Chromium, then starts the helper at login: a launchd agent `com.fact-checker.helper` on macOS, a systemd user service `fact-checker.service` on Linux, with the PATH of the setup shell. `fact-checker doctor` prints one line per check with its fix. The helper reads optional keys (`HF_TOKEN`, `FACT_CHECK_API_KEY`) from `~/.fact-checker/.env`. `install.sh` installs uv, yt-dlp, ffmpeg (imageio-ffmpeg static build) and the helper, each only if missing, then runs `setup`; `INSTALL-AGENT.md` leads an AI agent through it. `setup` writes the logged-in agent CLI (`claude`, then `codex`) into a new `config.toml` and copies the built extension to `~/.fact-checker/extension`. 🟢 **NEW · S39** `setup --provider claude|codex` writes the provider the installing agent names (only if it is logged in; the other lines of `config.toml` stay); `fact-checker provider [claude|codex]` prints the provider, or writes it and restarts the login helper (`launchctl kickstart -k`, `systemctl --user restart`). `fact-checker key set <NAME>` stores a key from a hidden prompt; `doctor --json` gives the checks to an agent. 🟢 **NEW · S40** setup and doctor refuse a `claude` under the Claude app's versioned folder (`…/Claude/claude-code/<version>/`), which the next app update removes: fix the standalone installer |
 | Speech engine | mlx-whisper on Apple silicon, faster-whisper on other machines, both through `uv run --script`; with no uv, a video without captions stops with a reason that names the doctor |
@@ -344,8 +358,12 @@ src/helper/fact_checker/server.py   HTTP entry point
 src/helper/fact_checker/cli.py      CLI entry point
 src/extension/                      TypeScript, Manifest V3
 tests/golden/                       synthetic dialogues + expected flags
-tests/acceptance/                   approved acceptance tests
-tests/fakes/                        one folder per external system
+tests/acceptance/                   acceptance tests of the open slices only
+tests/helper/, extension/, collector/   one suite per part: test_judge.py, card.test.ts, marks.test.ts, …
+tests/contracts/                    one contract test per external system
+tests/support/                      shared fakes and helpers of the tests, no test
+tests/fakes/                        recorded answers, one folder per external system
+evals/                              measurements on real interviews or paid models; CI never runs them
 src/helper/fact_checker/feedback.py, analyses.py   collector client
 src/helper/fact_checker/install.py  setup, doctor, key set
 src/helper/fact_checker/extension/  built extension, committed
@@ -367,8 +385,9 @@ The `verify` key in `.claude/mini-spec.yml` holds the command. `/mini-implement`
 
 | Checks | Tool |
 |---|---|
-| Helper tests | pytest, run with `uvx` from `src/helper/` |
-| Extension and collector types and tests | `tsc --noEmit` (extension and `src/collector`), vitest; esbuild builds into `src/helper/fact_checker/extension/` |
+| Helper tests | pytest, run with `uvx` from `src/helper/`: `tests/helper/`, `tests/contracts/`, `tests/acceptance/`; fakes from `tests/support/` on the path |
+| Extension and collector types and tests | `tsc --noEmit` (extension and `src/collector`), vitest on `tests/extension/`, `tests/collector/`, `tests/acceptance/`; esbuild builds into `src/helper/fact_checker/extension/` |
+| Measurements | `evals/`, run by hand; not part of verify or CI |
 | CI | GitHub Actions, `.github/workflows/checks.yml`: the same checks on each pull request and push to main, and the shipped extension matches a fresh build |
 | Layer rules of Repo layout | none yet |
 
@@ -412,7 +431,7 @@ Each person runs their own helper and pays their own readings. The collector sha
 | 🟢 **NEW · S35** The card follows the author's CALVET brand; its fonts ship in the helper, with no external font request (chat) | One look across the author's channels; the image renders offline | The S14 infographic |
 | 🟢 **NEW · S37** The card links to the page of its approved analysis on the collector (chat) | The sources and the rubric behind each number are one click away | A per-video page in the helper, which nobody else can open |
 | 🟢 **NEW · S35** No topic per claim; the card has no weakest topic (chat) | A topic field costs every part reading for one line of the card | A topic per claim in the part reading |
-| 🟢 **NEW · S36** A comparison needs every flag of each person marked; rates per hour of speech; no score or ranking (chat) | A partial review would compare the reviewer's effort, not the speakers | A single score per person |
+| 🟢 **NEW · S36** A comparison counts what the judge keeps, as the profile card does; rates per hour of speech; no score or ranking (chat) | The same rule on every card, so the people compare on one footing | A single score per person; a comparison that needs every flag marked |
 
 ## Security
 

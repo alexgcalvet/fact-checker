@@ -312,7 +312,7 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
     try:
         tr = transcript.fetch(video_id)
         spoken, reader = tr.language, lang or tr.language
-        budgeted = scheduler.BudgetedLLM(llm, scheduler.budget(tr) + (rulings.calls(tr) if judge else 0))
+        budgeted = scheduler.BudgetedLLM(llm, scheduler.budget(tr))
         searching = searcher and scheduler.BudgetedLLM(searcher, scheduler.budget(tr))
         screening = screen and scheduler.BudgetedLLM(screen, scheduler.budget(tr))
         verdicts = budgeted.through(verdict) if verdict else budgeted
@@ -425,8 +425,10 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
         with lock:
             checked.extend(claims)
         try:
-            if factcheck and claims:
-                published = {c.quote: [p for q in c.queries for p in _search(factcheck, q, spoken)] for c in claims}
+            if claims and not no_check:
+                # Published fact-checks come first when there is a key; without one, the web search checks alone.
+                published = {c.quote: [p for q in c.queries for p in _search(factcheck, q, spoken)] if factcheck else []
+                             for c in claims}
                 flags, done = check_claims(claims, tr.published_at, published,
                                            Logged(verdicts, usage("fact_check", chunk), lines),
                                            searching and Logged(searching, usage("search", chunk), lines), web,
@@ -484,19 +486,21 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
     data = store.load(video_id)
     if status == "done" and judge:
         lines = []
-        data["flags"] = judged(data["flags"], tr, Logged(scheduler.BudgetedLLM(judge, budgeted.left), usage("judge"), lines),
-                               reader)
+        # The judge has calls of its own: the parts and the fact checks cannot spend them.
+        t0 = time.monotonic()
+        try:
+            data["flags"] = judged(data["flags"], tr, Logged(scheduler.BudgetedLLM(judge, rulings.calls(tr)),
+                                                             usage("judge"), lines), reader)
+        except Exception as e:  # the flags stay as found; the usage log says why
+            lines.append(usage("judge")(t0) | {"stop_reason": f"error: {e}"})
         log(lines)
     store.save(data | counts() | {"status": status, "stop_reason": reason, "cost_usd": round(cost[0], 6)})
     return status == "done" and all(any(a <= s.t < b for a, b in finished) for s in tr.segments)
 
 
 def judged(flags: list[dict], transcript, llm, reader: str | None = None) -> list[dict]:
-    """The flags with the judge's verdict in `judge`, its reasons in `reader`; a failed judge leaves them as found."""
-    try:
-        verdicts = rulings.judge(flags, transcript, llm, reader)
-    except Exception:
-        return flags
+    """The flags with the judge's verdict in `judge`, its reasons in `reader`."""
+    verdicts = rulings.judge(flags, transcript, llm, reader)
     return [f | {"judge": verdicts[f["id"]]} if f["id"] in verdicts else f for f in flags]
 
 
@@ -567,8 +571,11 @@ class Helper:
             if whole and url and sharing(self.home):
                 try:
                     analyses.upload(self.home, url, self.store.load(video_id))
-                except (OSError, ValueError):  # refused (a better analysis is kept) or no answer: the flags stay local
-                    pass
+                except (OSError, ValueError) as e:  # refused (a better analysis is kept) or no answer: the flags stay local
+                    print(f"fact-checker helper: the analysis of {video_id} was not shared: {e}", flush=True)
+            elif url and sharing(self.home):
+                print(f"fact-checker helper: the analysis of {video_id} was not shared: it does not cover the whole video",
+                      flush=True)
         finally:
             with self.lock:
                 self.running.discard(video_id)

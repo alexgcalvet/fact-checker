@@ -5,7 +5,7 @@
 <style>
 $fonts
 /* The InterviewCard of the CALVET canvas, 4:5: night, bone titles, verdict colours; every text 30 px or more. */
-:root{--n0:#05070B;--bone:#E6DCC4;--warm:#FFF0D6;--t1:rgba(238,236,229,.95);--t2:rgba(226,229,234,.6);--t3:rgba(214,219,227,.55);--grey:#5A6680;--green:#29A98E;--amber:#D99A2B;--red:#E5484D;--mag:#D06BA8;--twa:#F0BE6A;--ter:#F49A9C}
+:root{--n0:#05070B;--bone:#E6DCC4;--warm:#FFF0D6;--t1:rgba(238,236,229,.95);--t2:rgba(226,229,234,.6);--t3:rgba(214,219,227,.55);--grey:#5A6680;--green:#29A98E;--amber:#D99A2B;--red:#E5484D;--mag:#D06BA8;--twa:#F0BE6A;--ter:#F49A9C;--trh:#E9A3CB}
 *{box-sizing:border-box;margin:0}
 html,body{width:1080px;height:1350px;overflow:hidden;background:#07090D}
 .root{position:relative;width:1080px;height:1350px;overflow:hidden;padding:0 72px;display:flex;flex-direction:column;color:var(--t1);font:450 30px/1.25 'Host Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -19,7 +19,7 @@ h1{left:72px;right:72px;top:196px;font:400 ${name_size}px/0.95 'Newsreader',seri
 .sub{left:72px;right:72px;top:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vi{display:block;flex-shrink:0;overflow:visible}
 .vc-fa{color:var(--red)}.vc-en{color:var(--amber)}.vc-re{color:var(--mag)}.vc-ok{color:var(--green)}.vc-pu{color:var(--grey)}
-.c-false{color:var(--ter)}.c-misleading{color:var(--twa)}
+.c-false{color:var(--ter)}.c-misleading{color:var(--twa)}.c-rhetoric{color:var(--trh)}
 
 /* The cover plate: the thumbnail dimmed, a 45deg band at full colour, cut by the Fault. */
 .plate{left:0;top:0;width:1080px;height:381px;overflow:hidden;clip-path:polygon(0 0,1080px 0,1080px 360px,660px 360px,640px 380px,0 380px)}
@@ -32,7 +32,7 @@ h1{left:72px;right:72px;top:196px;font:400 ${name_size}px/0.95 'Newsreader',seri
 .p-none{position:absolute;inset:0;background:linear-gradient(135deg,#1C2433,#0F131B 60%,#07090D)}
 .p-edge{position:absolute;inset:0;background:rgba(230,220,196,.3);clip-path:polygon(1110px 0,1112px 0,732px 380px,730px 380px)}
 .p-veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,9,13,.55) 0%,rgba(7,9,13,0) 30%,rgba(7,9,13,0) 62%,rgba(7,9,13,.85) 100%)}
-.p-side{position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,9,13,.78) 0%,rgba(7,9,13,.45) 42%,rgba(7,9,13,0) 62%)}
+.p-side{position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,9,13,.93) 0%,rgba(7,9,13,.82) 48%,rgba(7,9,13,.25) 64%,rgba(7,9,13,0) 72%)}
 /* The Fault: a 1px horizon that steps once at 45deg. */
 .fault{left:0;right:0;top:360px;height:21px;--s:20px;--x:640px;--fc:230,220,196}
 .fault>i{position:absolute;height:1px;display:block}
@@ -53,21 +53,19 @@ h1{left:72px;right:72px;top:196px;font:400 ${name_size}px/0.95 'Newsreader',seri
 .leg{display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--t2)}
 .leg b{color:var(--t1);font-weight:550}
 
-/* Severity counts and the devices the guest repeats, side by side. */
-.cols{margin-top:44px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:56px}
+/* Severity counts on one line, then the devices the guest repeats in two columns across the card. */
+.sevline{margin-top:28px;display:flex;align-items:baseline;gap:24px;white-space:nowrap}
+.sevline b{font-weight:550;color:var(--bone)}
 .h2{font-weight:550;letter-spacing:-.005em}
-.list{margin-top:14px;display:flex;flex-direction:column;gap:8px}
-.sev{display:grid;grid-template-columns:150px 1fr 56px;align-items:center;gap:16px}
-.sev .track{height:12px;border-radius:3px;background:#1C2433;position:relative}
-.sev .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--bone)}
-.sev .num{text-align:right;color:var(--bone)}
+.devs{margin-top:16px}
+.grid2{margin-top:6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,auto);grid-auto-flow:column;column-gap:56px;row-gap:0}
 .row{display:flex;align-items:center;gap:14px;white-space:nowrap}
 .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.dodged{margin-top:24px}
+.dodged{margin-top:14px}
 .dodged b{font-weight:550;color:var(--bone)}
 
 /* The two most serious: quote and minute, then verdict, correction and source. */
-.gravest{margin-top:32px}
+.gravest{margin-top:20px}
 .items{margin-top:8px;display:flex;flex-direction:column}
 .item{padding:10px 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 .item:last-child{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -1px 0 rgba(255,255,255,.08)}
@@ -106,10 +104,8 @@ $series
 <div class="bar" data-block="bar">$bar</div>
 <div class="legend">$legend</div>
 
-<div class="cols">
-<div data-block="severity"><div class="h2">$severity_head</div><div class="list">$severity</div></div>
-<div data-block="devices"><div class="h2">$devices_head</div><div class="list">$devices</div></div>
-</div>
+<div class="sevline" data-block="severity"><span class="h2">$severity_head</span><span>$severity</span></div>
+<div class="devs" data-block="devices"><div class="h2">$devices_head</div><div class="grid2">$devices</div></div>
 <div class="row dodged" data-block="dodged"><svg class="vi vc-re" width="30" height="30" aria-hidden="true"><use href="#f2-re"></use></svg><span>$dodged</span></div>
 
 <div class="gravest" data-block="gravest"><div class="h2">$gravest_head</div><div class="items">$gravest</div></div>

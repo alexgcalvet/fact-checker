@@ -45,7 +45,8 @@ flowchart LR
 4. **New feature:** the project builds features from short specs in `docs/specs/NNN-name/spec.md`.
    - First PR: the spec and its acceptance tests in `tests/acceptance/`, red.
    - The maintainer approves the spec. Then the build PR makes the tests green.
-   - Never edit an approved acceptance test. If one looks wrong, open an issue.
+   - Never edit an approved acceptance test while its slice is open. If one looks wrong, open an issue.
+   - When the last item of the slice is done, its tests move into the suite of their part (`/mini-implement <id> promote`). From then on they are ordinary tests: merge or remove one when another test checks the same behaviour.
 5. **CI must be green.** It runs the same checks as below.
 6. **A maintainer reviews and merges.** The maintainer has the final say while the project is small.
 
@@ -60,6 +61,17 @@ Feedback on flags does not need a PR: marks reach the project through the extens
 | Extension and collector | `cd src/extension && npm ci && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run && npm run build` |
 
 - Tests never call a real model or a real service. They use fakes on `PATH` and local fake servers.
+- Find a test by the part it checks:
+
+| Part | Tests |
+|---|---|
+| Helper | `tests/helper/test_<part>.py`: reading, fact_check, judge, transcript, providers, cost, setup, sharing, summary, server, eval |
+| Extension | `tests/extension/<screen>.test.ts`: card, panel, strip, settings, start, bundle |
+| Collector | `tests/collector/<route>.test.ts`: marks, analyses |
+| External systems | `tests/contracts/`: one contract test each; SKIP without credentials |
+| Shared fakes and helpers | `tests/support/` (no test); recorded answers in `tests/fakes/` |
+| Open slices | `tests/acceptance/` |
+| Measurements on real interviews or paid models | `evals/`, one line each in `evals/README.md`; CI never runs them |
 - A real analysis spends the subscription or API key of the person who runs it. Say in the PR what a real run costs, if you made one.
 
 ## Reporting

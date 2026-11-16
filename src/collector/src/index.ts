@@ -25,6 +25,7 @@ const VIDEO = /^[A-Za-z0-9_-]{6,20}$/;
 
 const text = (max: number, min = 0) => (v: unknown) => typeof v === "string" && v.length >= min && v.length <= max;
 const orNull = (check: (v: unknown) => boolean) => (v: unknown) => v === null || check(v);
+const object = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v);
 const number = (lo: number, hi: number) => (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
 
 // Each field of a sent mark and its check. A mark with any other field is refused.
@@ -58,7 +59,10 @@ const ANALYSIS: Record<string, (v: unknown) => boolean> = {
   title: orNull(text(500)),
   channel: orNull(text(200)),
   duration: orNull(number(0, 1e6)),
-  speakers: (v) => !!v && typeof v === "object" && !Array.isArray(v),
+  speakers: object,
+  people: orNull(object),
+  claims: orNull(object),
+  questions: orNull(object),
   readers: (v: any) => !!v && typeof v === "object" && !!v.parts && orNull(text(100, 1))(v.parts.model),
   cost_usd: orNull(number(0, 1e6)),
   analysed_until: number(0, 1e6),

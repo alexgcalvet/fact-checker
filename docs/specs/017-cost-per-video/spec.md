@@ -18,7 +18,7 @@ One analysed interview of 1.5 hours costs about 20 dollars in API terms today, 1
 - [X] A3 · A cheaper model searches, Opus judges
   - **Story:** For a part with two central figures, one reading by Sonnet with web search returns the evidence with its sources, and one reading by Opus with no tools turns that evidence into verdicts. A false figure still shows as "Dato falso" with the same sources.
   - **Test:** `tests/acceptance/test_s17_a3_search_then_judge.py`
-- [ ] A4 · The 1.5-hour interview costs at most a third and catches as much
+- [X] A4 · The 1.5-hour interview costs at most a third and catches as much — moved to measurements (`evals/s17-a4-real-cost.sh`), not measured yet
   - **Story:** The person runs the cost check. It analyses the 1.5-hour interview again in a separate helper home and prints its cost: at most 7 dollars (it was about 20), with the high-importance misses caught no fewer than in the S16 run and a judge drop share no higher.
   - **Test:** `check: bash tests/acceptance/s17-a4-real-cost.sh`
 
