@@ -1316,3 +1316,28 @@ def test_versioned_claude(tmp_path, monkeypatch, capsys):
     code, out = run(monkeypatch, capsys, "setup", "--provider", "claude")
     assert code == 0 and REFUSED not in out and agent.exists(), f"FAIL S40 A2 · the stable claude: {code} {out}"
     print("PASS S40 A2 · Setup refuses a Claude that moves on update")
+
+
+# Setup when launchd refuses the helper
+#
+# Story: Codex runs `fact-checker setup` inside its sandbox on a Mac, where `launchctl bootstrap` fails with
+# "Bootstrap failed: 5: Input/output error" (seen on 2026-11-16). Setup ends with one helper line that names the error
+# and says to run setup outside the sandbox with the person's approval, never with a Python traceback.
+#
+# Setup: the fake machine of S38 on macOS, with a `launchctl` whose bootstrap prints that error and exits 5.
+
+REFUSING_LAUNCHD = """\
+import sys
+if sys.argv[1] == "bootstrap":
+    sys.exit("Bootstrap failed: 5: Input/output error")
+"""
+
+
+def test_setup_when_launchd_refuses(tmp_path, monkeypatch, capsys):
+    machine(tmp_path, monkeypatch, commands={"launchctl": REFUSING_LAUNCHD})
+    code, out = run(monkeypatch, capsys, "setup", "--provider", "claude")
+    helper = [line for line in out if line.startswith("helper:")]
+    assert code == 1, f"setup exit {code} when launchd refuses: {out}"
+    assert len(helper) == 1 and "Input/output error" in helper[0], helper
+    for words in ("outside the sandbox", "the person's approval"):
+        assert words in helper[0], f"the fix lacks {words!r}: {helper[0]}"
