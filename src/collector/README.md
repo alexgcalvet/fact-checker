@@ -50,7 +50,7 @@ To remove a bad shared analysis: `curl -X DELETE -H "Authorization: Bearer $FEED
 
 ## Change and test
 
-- Tests: `tests/acceptance/s24-a3-collector-stores.test.ts`, `s24-a4-collector-read.test.ts`, `s28-a3-collector-analyses.test.ts` and `s30-a1-collector-review.test.ts`, run by the extension's `npx vitest run`. They use Node's built-in SQLite as the D1 database.
+- Tests: `tests/collector/marks.test.ts` and `tests/collector/analyses.test.ts`, one per route, run by the extension's `npx vitest run`. They use Node's built-in SQLite as the D1 database (`tests/support/d1_fake.ts`).
 - Type check: `cd src/extension && npx tsc -p ../collector --noEmit`.
-- Contract test against the deployed collector: set `S24_COLLECTOR_URL` and `FEEDBACK_ADMIN_TOKEN`, then run `tests/acceptance/test_contract_collector_marks.py`. It stores one invented mark under a new random install id.
+- Contract test against the deployed collector: set `S24_COLLECTOR_URL` and `FEEDBACK_ADMIN_TOKEN`, then run `tests/contracts/test_contract_collector_marks.py`. It stores one invented mark under a new random install id.
 - After a change, run `npx wrangler deploy` again.

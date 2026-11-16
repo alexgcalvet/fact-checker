@@ -1,4 +1,0 @@
-A1 a2f2e4f753456716c0dfffb0a3ac2ad671b32769f6e1d9a3c2e0d7b104cfc3f4 tests/acceptance/test_s15_a1_judge_verdicts.py
-A2 b1347931475b25597e7f3b194057ad4a29dec9b44cebc68fe1619464186c0f24 tests/acceptance/s15-a2-judge-display.test.ts
-A3 c17bf7b18e0af2ede1e2efb9e090e221782d3d89fe2e2118b8c724488a2fbe30 tests/acceptance/test_s15_a3_summary_speaker.py
-A4 31353bcbe4bf9598fc0e363dab70d91dd69c0080a62de122a45002e4db8502d8 tests/acceptance/s15-a4-judge-real-marks.sh

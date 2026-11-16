@@ -15,7 +15,7 @@ Today the fact-checker only works for people who pay for Claude. This slice lets
 - [X] A2 · The real Codex CLI answers as the adapter expects
   - **Story:** The person, logged in to Codex, runs the contract test. One real Codex reading returns a thread id, an answer that follows the schema and its token usage, with the same fields as the recorded fake. Without a working login it says SKIP and passes.
   - **Test:** `tests/acceptance/test_contract_codex_cli_exec.py`
-- [ ] A3 · Codex on the 1.5-hour interview, beside Claude
+- [X] A3 · Codex on the 1.5-hour interview, beside Claude — moved to measurements (`evals/s20-a3-codex-real.sh`), not measured yet
   - **Story:** The person runs the Codex check. It analyses the 1.5-hour interview with Codex in a separate helper home and prints the precision on the person's marks (of the Codex flags that match a marked card, the share marked correct), the precision of those marks on Claude, and how many of the 9 known misses Codex catches. It exits 0 when the analysis ends done and every reading ran Codex.
   - **Test:** `check: bash tests/acceptance/s20-a3-codex-real.sh`
 - [X] A4 · Codex flags meet Codex bars

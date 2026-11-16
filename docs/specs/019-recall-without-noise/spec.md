@@ -9,13 +9,13 @@ The live analysis of the 1.5-hour interview catches only 3 of the 9 problems tha
 
 ## Acceptance
 
-- [ ] A1 · A new analysis reads the parts as one conversation
+- [X] A1 · A new analysis reads the parts as one conversation
   - **Story:** The person opens an invented video and the helper starts its analysis as it does for the extension. Every part reading continues the same Claude Code conversation, not a fresh reading with a short window.
   - **Test:** `tests/acceptance/test_s19_a1_conversation_default.py`
-- [ ] A2 · The judge keeps a contradiction that it excused on the speaker's behalf
+- [X] A2 · The judge keeps a contradiction that it excused on the speaker's behalf — moved to measurements (`evals/s19-a2-judge-keeps-contradictions.sh`), not measured yet
   - **Story:** The person runs the judge check on the two analyses of the 1.5-hour interview of the S18 comparison. The judge reads each one again with the new rules. Each self-contradiction near 18:40, 55:05 or 39:40 that the analysis found is kept, not dropped, and the check prints the judge's verdict on each one.
   - **Test:** `check: bash tests/acceptance/s19-a2-judge-keeps-contradictions.sh`
-- [ ] A3 · The live analysis catches 5 of the 9 misses on the 1.5-hour interview
+- [X] A3 · The live analysis catches 5 of the 9 misses on the 1.5-hour interview — moved to measurements (`evals/s19-a3-real-recall.sh`), not measured yet
   - **Story:** The person runs the recall check. It analyses the 1.5-hour interview from the start in a separate helper home, the way the helper now does by default. It prints each of the 9 high-importance misses as caught, dropped by the judge or missed, the share of flags the judge drops and the cost. It exits 0 with at least 5 of 9 caught, at most 32 % dropped and at most 9 dollars.
   - **Test:** `check: bash tests/acceptance/s19-a3-real-recall.sh`
 
@@ -32,10 +32,10 @@ The live analysis of the 1.5-hour interview catches only 3 of the 9 problems tha
 
 ## Tasks
 
-- [ ] T001 [P] Set `CONTEXT_MODE` to `conversation` in `server.py`; update `docs/ARCHITECTURE.md` → A1
-- [ ] T002 [P] Add the contradiction rule to the judge rules in `judge.py` → A2, FR-001
-- [ ] T003 [P] Sharpen the part prompt in `pipeline.py` and the search and verdict prompts in `factcheck.py` → A3
-- [ ] T004 Run the recall check on the 1.5-hour interview; change a prompt again only if the first run shows why → A3
+- [X] T001 [P] Set `CONTEXT_MODE` to `conversation` in `server.py`; update `docs/ARCHITECTURE.md` → A1
+- [X] T002 [P] Add the contradiction rule to the judge rules in `judge.py` → A2, FR-001
+- [X] T003 [P] Sharpen the part prompt in `pipeline.py` and the search and verdict prompts in `factcheck.py` → A3
+- [X] T004 Run the recall check on the 1.5-hour interview; change a prompt again only if the first run shows why → A3 — moved to measurements (`evals/s19-a3-real-recall.sh`), not measured yet
 
 ## Requirements
 

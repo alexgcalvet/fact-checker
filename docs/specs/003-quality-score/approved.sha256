@@ -1,2 +1,0 @@
-A2 f1bb22d45c8ec8956d36a32d450162c9eef6eff2a3501bdf238dd3d0bd526b0f tests/acceptance/test_s3_a2_eval_scores.py
-A3 c00f25ae0b9ebd3f7023dce28f6f86c6e3521424cfa287137ffab129c8727a6b tests/acceptance/test_s3_a3_pick_threshold.py

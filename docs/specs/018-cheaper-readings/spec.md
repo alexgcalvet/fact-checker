@@ -19,7 +19,7 @@ The 1.5-hour interview still costs 13 dollars to analyse. Two thirds of each par
   - **Story:** On an invented 60-minute video, the person starts at 10:00. The helper analyses from 10:00 up to 10 minutes ahead of the playback second it last heard from the extension, and goes further as playback moves. When the extension stops asking for a minute (the tab closed), the analysis pauses; when it asks again, it goes on. The parts behind the start second are analysed only if the person goes back to them.
   - **Edge case:** WHEN the person jumps from 15:00 to 45:00 THEN the next parts start at 45:00, and 25:00–45:00 stays unanalysed until watched.
   - **Test:** `tests/acceptance/test_s18_a3_follow_viewer.py`
-- [ ] A4 · The cheaper context mode wins on the 1.5-hour interview
+- [X] A4 · The cheaper context mode wins on the 1.5-hour interview — moved to measurements (`evals/s18-a4-context-ab.sh`), not measured yet
   - **Story:** The person runs the comparison check. It analyses the 1.5-hour interview from the start, once per context mode, each in a separate helper home, and prints per mode the cost, the high-importance misses caught and the share of flags the judge drops. It exits 0 when the cheaper mode costs at most 6 dollars, catches at least 4 of the 9 misses and the judge drops at most 43 %; it prints which mode won.
   - **Test:** `check: bash tests/acceptance/s18-a4-context-ab.sh`
 
@@ -40,7 +40,7 @@ The 1.5-hour interview still costs 13 dollars to analyse. Two thirds of each par
 - [X] T001 [P] Five-minute cache and medium effort in `llm_claude_cli.py`; results-only search, 2 searches per figure in `factcheck.py` → A1
 - [X] T002 Add the short-window and long-conversation context modes in `pipeline.py`, `scheduler.py`, `llm_claude_cli.py` → A2
 - [X] T003 Send the playback second with each poll and analyse up to 10 minutes ahead, pausing after a minute of silence, in `content.ts`, `sw.ts`, `server.py`, `scheduler.py`; update `docs/ARCHITECTURE.md` → A3
-- [ ] T004 Write the A/B check and keep the winning mode as the default → A4
+- [X] T004 Write the A/B check and keep the winning mode as the default → A4 — moved to measurements (`evals/s18-a4-context-ab.sh`), not measured yet
 
 ## Requirements
 

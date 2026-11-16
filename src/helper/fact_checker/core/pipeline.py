@@ -158,7 +158,8 @@ For each flag:
 Also list the checkable claims of the PART: concrete figures, dates, rankings or facts that public data
 can confirm or refute (not opinions, new promises or predictions). Also list a statement that a plan,
 programme or building already exists or was done. Also list a statement of the speaker about what they
-said before ("nunca dije que…") and a statement about a promise of the speaker or their side: whether it
+said before ("nunca dije que…"), about their own past conduct or ties (where they were, whom they knew or spoke
+with, what they decided: "no me fui de vacaciones", "con él casi no tenía relación") and a statement about a promise of the speaker or their side: whether it
 was kept, or figures of what was delivered toward it. When an answer to a question gives a figure, also list
 the words of the answer that say what the figure counts as a claim of their own (such as "entregadas o en
 proceso", "delivered or in process"), because they may count something other than what was asked. Also list a figure that the speaker
@@ -169,12 +170,17 @@ confirm or refute it. For each claim:
 - queries: up to 3 short {spoken} search queries to find a published fact-check of it.
 - question: the question that another speaker asked just before the claim, copied from the PART or the
   CONTEXT, or null.
-- kind: own_words for a statement about what the speaker said before, promise for a statement about a
+- kind: own_words for a statement about what the speaker said or did before, or about their own past conduct
+  or ties, promise for a statement about a
   promise of the speaker or their side or its progress, else fact.
-- central: true when the claim carries the speaker's argument: they build their point on it, or it answers
-  the question asked. False for a figure said in passing, as an aside or as background.
-- repeats: the number of the CHECKED line that states the same figure or fact, said again in other words,
-  else null.
+- central: true by default for any figure or fact about public life: it answers the question asked, it
+  carries the speaker's argument, it describes a public event or a figure of the topic under discussion (also
+  as background, such as how many people crossed a border), or it is a figure of the speaker's record or of a
+  rival's. False only for a personal anecdote, a fact nobody disputes (a capital, who governs), a figure the
+  speaker quotes in order to reject it, or a figure of another topic said in passing and never used again.
+- repeats: the number of the CHECKED line that states the same figure for the same thing, or the same fact
+  about the same event, said again in other words, else null. A claim on the same topic with another figure,
+  date, event or person is not a repeat, and an own_words claim repeats only the same statement.
 
 Also list each question that one speaker (usually the interviewer) asks another, in the PART or the
 CONTEXT, whose answer ends inside the PART: the next question or a new topic starts in the PART. Skip an

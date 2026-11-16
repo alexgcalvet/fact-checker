@@ -108,13 +108,18 @@ official and primary sources: {sources}. Make at most 2 searches per claim. Do n
 title, snippet and date that the search results show.
 For a claim with a figure, look for each credible measure of it, the ones that support the claim and the ones
 that do not.
-For an own_words claim, search the speaker's earlier public statements: {earlier}.
+For an own_words claim, search the speaker's earlier public statements and records of their conduct
+(interviews, their own posts on social networks, official agendas, news of the time): {earlier}.
 For a promise claim, find the original promise and its status on the publish date.
 For a figure of the effect of a rule or a measure (a saving, a margin, a cost), search how the rule works: what
 it takes away as well as what it gives.
 """
 
-JUDGE = """An official figure is not the truth by itself: a metric can be defined or framed to fit a side. For a
+JUDGE = """An official figure is not the truth by itself: a metric can be defined or framed to fit a side, and governments and
+parties also give false figures. A measure produced by the speaker's own government, party or an administration they
+lead or led never supports the speaker's claim by itself: it needs an independent measure (a statistics office,
+Eurostat, a central bank, a fiscal council, a court, documents published by the press). With only the speaker's own
+side's measure, the verdict is at least disputed, and the reason says that only their own side gives that figure. For a
 claim with a figure, list each credible measure of it, the ones that support the claim and the ones
 that do not. Give each measure the tier of its producer:
 {tiers}
@@ -122,7 +127,9 @@ that do not. Give each measure the tier of its producer:
 Two more ways a claim can mislead:
 - definition_swap: the speaker answers a question about one metric with a wider or different one (asked
   for homes delivered, answers with homes "delivered or in process"). Only when the question is listed
-  under the claim.
+  under the claim. It also covers an answer to a criticism of one thing with a figure of another (criticised
+  for the upkeep of a line, answers with the investment in renewing it), when the figure does not measure
+  what was criticised.
 - plan_as_fact: the speaker talks about a plan, a programme or homes as if they already existed or were
   done, while a dated source shows they are still announced, planned or in progress.
 A figure of the effect of a rule or a measure (a saving, a margin, a cost) must follow from how the rule works.
