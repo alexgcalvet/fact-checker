@@ -13,15 +13,16 @@ from pathlib import Path
 
 from fact_checker import server
 from fact_checker.adapters.llm_claude_cli import ClaudeCLI
-from fact_checker.adapters.youtube import parse_json3
 from fact_checker.core import scheduler
-from fact_checker.core.flags import Segment, Transcript
+from fact_checker.core.flags import Segment
 from fact_checker.server import run_analysis
-from language_fakes import ATTACK, FactCheck, FALSE, readings, setup, text
-from screen_fakes import fake_clis, fake_video, FALSE as FALSE_screen, GREETING, jsonl
+from interview_fakes import fake_clis, FALSE as FALSE_screen, GREETING, jsonl, THREE_PARTS
+from language_fakes import ATTACK, FALSE, readings, setup, text
+from video_fakes import FakeTranscript, fake_video, GUEST, HOST, JSON3Captions, NoPublishedChecks, spoken, VOICES
 
 
 # S1 A2 · Flags quote the exact words, at their second, from the closed list only
+# S7 A3 · "Evasion" is no longer a fallacy: a name outside the list, such as "evasion", gives no flag (Case 4)
 #
 # Story: From an invented 4-minute dialogue with 3 planted fallacies, the analysis returns flags whose
 # words appear word for word in the captions, whose second is when those words start, and whose name is
@@ -48,18 +49,13 @@ SCRIPTED = [
 ]
 
 
-class FakeTranscript_s1a2:
-    def fetch(self, video_id):
-        return parse_json3(json.loads(FAKE.read_text()), published_at="2026-11-10")
-
-
 class FakeClaude:
     def complete(self, prompt, schema):
         return {"flags": [dict(f) for f in SCRIPTED]}
 
 
 def test_flags_from_captions(tmp_path):
-    run_analysis("invented", 0, transcript=FakeTranscript_s1a2(), llm=FakeClaude(), home=tmp_path)
+    run_analysis("invented", 0, transcript=JSON3Captions(FAKE), llm=FakeClaude(), home=tmp_path)
     data = json.loads((tmp_path / "videos" / "invented.json").read_text())
     by_label = {f["label"]: f for f in data["flags"]}
 
@@ -115,21 +111,12 @@ A4 = "Sí lo mantendremos el año que viene con el mismo importe"
 LINES = [(0, Q1), (3, A1), (14, Q2), (18, A2), (25, Q3), (31, A3), (40, Q4), (43, A4)]
 
 
-def words(start, text):
-    return [Segment(t=start + i * 0.5, text=w) for i, w in enumerate(text.split())]
-
-
 def end(start, text):
     return start + (len(text.split()) - 1) * 0.5
 
 
 def tail(text, n=5):
     return " ".join(text.split()[-n:])
-
-
-class FakeTranscript_s7a1:
-    def fetch(self, video_id):
-        return Transcript(segments=[s for start, text in LINES for s in words(start, text)], published_at="2026-11-10")
 
 
 def question(q, a, status, confidence):
@@ -141,7 +128,7 @@ QUESTIONS = [question(Q1, A1, "dodged", 0.9), question(Q2, A2, "dodged", 0.7), q
              question(Q4, A4, "answered", 0.9)]
 
 
-class FakeClaude_s7a1:
+class QuestionModel:
     def __init__(self):
         self.calls = 0
 
@@ -152,8 +139,8 @@ class FakeClaude_s7a1:
 
 
 def test_dodged_question(tmp_path):
-    claude = FakeClaude_s7a1()
-    run_analysis("questions", 0, transcript=FakeTranscript_s7a1(), llm=claude, home=tmp_path)
+    claude = QuestionModel()
+    run_analysis("questions", 0, transcript=FakeTranscript(spoken(LINES)), llm=claude, home=tmp_path)
     flags = json.loads((tmp_path / "videos" / "questions.json").read_text())["flags"]
     questions = [f for f in flags if f["type"] == "question"]
     by_question = {f["related"]["quote"]: f for f in questions}
@@ -191,43 +178,6 @@ def test_dodged_question(tmp_path):
     print("PASS S7 A1 · A dodged question is flagged at the end of its answer")
 
 
-# S7 A3 · "Evasion" is no longer a fallacy
-#
-# Story: In an invented interview, the model still names a passage "evasion" as a fallacy. The flag file has
-# no fallacy flag for it; the passage only goes to the log of candidate names.
-#
-# Setup: invented word-by-word captions of a host question and a guest answer; a fake Claude that returns
-# one flag labelled "evasion" on the guest's words, no claim and no question; a temporary helper home.
-
-HOST_s7a3 = "¿Cuántas viviendas se han entregado?"
-GUEST_s7a3 = "Mire lo importante es que hemos aprobado la primera ley de vivienda"
-PASSAGE = "lo importante es que hemos aprobado la primera ley de vivienda"
-
-
-class FakeTranscript_s7a3:
-    def fetch(self, video_id):
-        return Transcript(segments=words(0, HOST_s7a3) + words(3, GUEST_s7a3), published_at="2026-11-10")
-
-
-class FakeClaude_s7a3:
-    def complete(self, prompt, schema, tools=()):
-        return {"flags": [{"quote": PASSAGE, "label": "evasion", "speaker": "Invitado",
-                           "reason": "No responde a la pregunta.", "confidence": 0.9}], "claims": []}
-
-
-def test_evasion_not_fallacy(tmp_path):
-    run_analysis("evasion", 0, transcript=FakeTranscript_s7a3(), llm=FakeClaude_s7a3(), home=tmp_path)
-    flags = json.loads((tmp_path / "videos" / "evasion.json").read_text())["flags"]
-
-    # Case 1 · the model names the passage "evasion" → no fallacy flag in the flag file
-    assert not [f for f in flags if f["type"] == "fallacy" or f["label"] == "evasion"], flags
-
-    # Case 2 · the same passage → one line in the log of candidate names
-    log = [json.loads(line) for line in (tmp_path / "candidates.log").read_text().splitlines()]
-    assert [(c["label"], c["quote"]) for c in log] == [("evasion", PASSAGE)], log
-    print('PASS S7 A3 · "Evasion" is no longer a fallacy')
-
-
 # S8 A1 · A speaker who contradicts themself gets a flag at the second statement
 #
 # Story: In an invented interview, the guest says "no vamos a subir el IVA" and, four minutes later,
@@ -244,14 +194,13 @@ def test_evasion_not_fallacy(tmp_path):
 # question. A second run uses the same captions without voices. The real bars of thresholds.json; a
 # temporary helper home.
 
-HOST, GUEST = "SPEAKER_00", "SPEAKER_01"
-FIRST_s8a1 = "no vamos a subir el IVA"
+NO_IVA = "no vamos a subir el IVA"
 SECOND = "subiremos el IVA de la luz el año que viene"
 PROPOSAL = "congelar las pensiones el año que viene"
 REJECTION = "no vamos a congelar las pensiones"
-LINES_s8a1 = [
+TAX_LINES = [
     (0, HOST, "Buenas noches hoy hablamos de impuestos con nuestro invitado"),
-    (6, GUEST, f"Gracias por invitarme lo digo claro {FIRST_s8a1} en esta legislatura"),
+    (6, GUEST, f"Gracias por invitarme lo digo claro {NO_IVA} en esta legislatura"),
     (40, HOST, f"Hay quien propone {PROPOSAL} para cuadrar las cuentas"),
     (250, GUEST, f"Y le adelanto una cosa {SECOND} para pagar la transición"),
     (280, GUEST, f"Mire nosotros {REJECTION} pase lo que pase"),
@@ -260,26 +209,15 @@ FIRST_T = 6 + 6 * 0.5
 SECOND_T = 250 + 5 * 0.5
 
 
-class FakeTranscript_s8a1:
-    def __init__(self, with_voices):
-        self.with_voices = with_voices
-
-    def fetch(self, video_id):
-        segments = [Segment(t=start + i * 0.5, text=w, speaker=voice if self.with_voices else None)
-                    for start, voice, text in LINES_s8a1 for i, w in enumerate(text.split())]
-        names = {HOST: "Presentadora", GUEST: "Invitado"} if self.with_voices else {}
-        return Transcript(segments=segments, published_at="2026-11-10", speakers=names)
-
-
 def contradiction(quote, earlier):
     return {"quote": quote, "earlier": earlier, "speaker": "Invitado", "earlier_speaker": "Invitado",
             "reason": f"Antes dijo «{earlier}» y ahora «{quote}».", "confidence": 0.9}
 
 
-CONTRADICTIONS = [contradiction(SECOND, FIRST_s8a1), contradiction(REJECTION, PROPOSAL)]
+CONTRADICTIONS = [contradiction(SECOND, NO_IVA), contradiction(REJECTION, PROPOSAL)]
 
 
-class FakeClaude_s8a1:
+class ContradictionModel:
     def __init__(self):
         self.calls = 0
 
@@ -291,8 +229,10 @@ class FakeClaude_s8a1:
 
 
 def analyse(tmp_path, with_voices):
-    claude = FakeClaude_s8a1()
-    run_analysis("taxes", 0, transcript=FakeTranscript_s8a1(with_voices), llm=claude, home=tmp_path)
+    claude = ContradictionModel()
+    captions = FakeTranscript(spoken(TAX_LINES), speakers=VOICES) if with_voices else \
+        FakeTranscript(spoken([(start, text) for start, _, text in TAX_LINES]))
+    run_analysis("taxes", 0, transcript=captions, llm=claude, home=tmp_path)
     flags = json.loads((tmp_path / "videos" / "taxes.json").read_text())["flags"]
     return [f for f in flags if f["type"] == "contradiction"], claude.calls
 
@@ -308,7 +248,7 @@ def test_self_contradiction(tmp_path):
     assert flag["label"] == "self"
     assert flag["t"] == SECOND_T
     assert flag["speaker"] == "Invitado"
-    assert flag["related"] == {"t": FIRST_T, "quote": FIRST_s8a1}
+    assert flag["related"] == {"t": FIRST_T, "quote": NO_IVA}
     assert flag["reason"] == CONTRADICTIONS[0]["reason"]
 
     # Case 2 · the model pins the host's proposal on the guest, but the audio puts it in the host's voice
@@ -323,7 +263,7 @@ def test_self_contradiction(tmp_path):
     # pairs flagged, since only the model's names tell the speakers apart
     found, _ = analyse(tmp_path / "no-voices", with_voices=False)
     by_quote = {f["quote"]: f for f in found}
-    assert by_quote.get(SECOND, {}).get("related") == {"t": FIRST_T, "quote": FIRST_s8a1}, found
+    assert by_quote.get(SECOND, {}).get("related") == {"t": FIRST_T, "quote": NO_IVA}, found
     assert by_quote.get(REJECTION, {}).get("related", {}).get("quote") == PROPOSAL, found
     print("PASS S8 A1 · A speaker who contradicts themself gets a flag at the second statement")
 
@@ -346,24 +286,16 @@ def test_self_contradiction(tmp_path):
 NAME = "Marta Gil"
 SENTENCE = "Ministro de Transportes del Gobierno de España desde noviembre de 2023."
 FIRST_LINE = f"Como dijo el ministro {NAME} los trenes van a llegar a su hora"
-LINES_s10a1 = [
+TRAIN_LINES = [
     (0, HOST, "Buenas noches hoy hablamos de trenes con nuestro invitado"),
     (180, GUEST, FIRST_LINE),
     (300, HOST, "Pero los retrasos siguen en todas las líneas del país"),
     (540, GUEST, f"Ya se lo expliqué a {NAME} la semana pasada en el ministerio"),
 ]
-FIRST_T_s10a1 = 180 + 4 * 0.5
+MENTION_T = 180 + 4 * 0.5
 
 
-class FakeTranscript_s10a1:
-    def fetch(self, video_id):
-        segments = [Segment(t=start + i * 0.5, text=w, speaker=voice)
-                    for start, voice, text in LINES_s10a1 for i, w in enumerate(text.split())]
-        return Transcript(segments=segments, published_at="2026-11-10",
-                          speakers={HOST: "Presentadora", GUEST: "Invitado"})
-
-
-class FakeClaude_s10a1:
+class ContextModel:
     def __init__(self, slow_first=False):
         self.calls = 0
         self.slow_first = slow_first
@@ -378,15 +310,15 @@ class FakeClaude_s10a1:
         return {"flags": [], "claims": [], "questions": [], "contradictions": [], "context": context}
 
 
-def analyse_s10a1(home, from_t=0, slow_first=False):
-    claude = FakeClaude_s10a1(slow_first)
-    run_analysis("trains", from_t, transcript=FakeTranscript_s10a1(), llm=claude, home=home)
+def analyse_trains(home, from_t=0, slow_first=False):
+    claude = ContextModel(slow_first)
+    run_analysis("trains", from_t, transcript=FakeTranscript(spoken(TRAIN_LINES), speakers=VOICES), llm=claude, home=home)
     flags = json.loads((home / "videos" / "trains.json").read_text())["flags"]
     return [f for f in flags if f["type"] == "context"], claude.calls
 
 
 def test_first_mention(tmp_path):
-    found, calls = analyse_s10a1(tmp_path / "in-order")
+    found, calls = analyse_trains(tmp_path / "in-order")
 
     # Case 1 · the guest names Marta Gil at minute 3 → a context flag at the second of the first
     # mention, with the name as said and one sentence on who he is
@@ -394,7 +326,7 @@ def test_first_mention(tmp_path):
     flag = found[0]
     assert flag["label"] == "person"
     assert flag["quote"] == NAME
-    assert flag["t"] == FIRST_T_s10a1
+    assert flag["t"] == MENTION_T
     assert flag["reason"] == SENTENCE
 
     # Case 2 · the guest names him again at minute 9, in another part → no second context flag
@@ -405,8 +337,8 @@ def test_first_mention(tmp_path):
 
     # Case 4 · the part of minute 9 is analysed before the part of minute 3 → still one context flag, at
     # the first mention
-    found, _ = analyse_s10a1(tmp_path / "out-of-order", from_t=500, slow_first=True)
-    assert [f["t"] for f in found] == [FIRST_T_s10a1], found
+    found, _ = analyse_trains(tmp_path / "out-of-order", from_t=500, slow_first=True)
+    assert [f["t"] for f in found] == [MENTION_T], found
     print("PASS S10 A1 · A named person gets one context card, at the first mention")
 
 
@@ -428,7 +360,7 @@ INSINUATION = "es verdad que su campaña se pagó con dinero de la prostitución
 DOUBLE = "usted tiene que dimitir por su asesor pero nuestro presidente no tiene por qué dimitir por el suyo"
 CHERRY = "el único dato que cuenta es el paro registrado de agosto"
 FEAR = "esto es una invasión y si no la paramos perderemos nuestro país"
-LINES_s16a1 = [
+FALLACY_LINES = [
     (0, HOST, "Buenas noches hoy entrevistamos al portavoz de la oposición"),
     (6, GUEST, f"Yo solo pregunto ¿{INSINUATION}? ¿Sí o no?"),
     (60, GUEST, f"Mire {DOUBLE} porque aquello fue otra cosa"),
@@ -448,7 +380,7 @@ QUOTES = {"insinuation": INSINUATION, "double_standard": DOUBLE, "cherry_picking
 def second(quote):
     """The second of the first word of the quote in its line."""
     needle = quote.split()
-    for start, _, text in LINES_s16a1:
+    for start, _, text in FALLACY_LINES:
         words = [w.strip("¿?") for w in text.split()]
         for i in range(len(words)):
             if words[i:i + len(needle)] == needle:
@@ -456,14 +388,7 @@ def second(quote):
     raise ValueError(quote)
 
 
-class FakeTranscript:
-    def fetch(self, video_id):
-        segments = [Segment(t=start + i * 0.5, text=w, speaker=voice)
-                    for start, voice, text in LINES_s16a1 for i, w in enumerate(text.split())]
-        return Transcript(segments=segments, published_at="2026-11-10", speakers={HOST: "Presentadora", GUEST: "Invitado"})
-
-
-class FakeClaude_s16a1:
+class NewFallacyModel:
     def __init__(self):
         self.prompts = []
         self.schemas = []
@@ -490,8 +415,8 @@ def player(labels):
 
 
 def test_new_fallacies(tmp_path):
-    claude = FakeClaude_s16a1()
-    run_analysis("rasero", 0, transcript=FakeTranscript(), llm=claude, home=tmp_path)
+    claude = NewFallacyModel()
+    run_analysis("rasero", 0, transcript=FakeTranscript(spoken(FALLACY_LINES), speakers=VOICES), llm=claude, home=tmp_path)
     found = json.loads((tmp_path / "videos" / "rasero.json").read_text())["flags"]
     flags = {f["label"]: f for f in found}
 
@@ -537,33 +462,23 @@ def test_new_fallacies(tmp_path):
 # at 24:00, so the part with 3:00 runs after the part with 25:00. A third run has an invented 140-minute talk where
 # every part states one position. A temporary helper home per run.
 
-FIRST_s16a2 = "no vamos a quitar el Ministerio de Igualdad"
+KEEP_MINISTRY = "no vamos a quitar el Ministerio de Igualdad"
 OTHER = "vamos a bajar el IVA de la luz"
-SECOND_s16a2 = "no habrá Ministerio de Igualdad en mi gobierno"
-POSITIONS = {FIRST_s16a2: "no quitará el Ministerio de Igualdad", OTHER: "bajará el IVA de la luz"}
+NO_MINISTRY = "no habrá Ministerio de Igualdad en mi gobierno"
+POSITIONS = {KEEP_MINISTRY: "no quitará el Ministerio de Igualdad", OTHER: "bajará el IVA de la luz"}
 LINE = "Invitado (3:00): no quitará el Ministerio de Igualdad"
 OTHER_LINE = "Invitado (24:10): bajará el IVA de la luz"
-LINES_s16a2 = [
+MINISTRY_LINES = [
     (0, HOST, "Buenas noches hoy hablamos de igualdad con nuestro invitado"),
-    (180, GUEST, f"{FIRST_s16a2} en ningún caso"),
+    (180, GUEST, f"{KEEP_MINISTRY} en ningún caso"),
     (1450, GUEST, f"{OTHER} y le digo más"),
     (1490, HOST, "¿Y qué pasará con ese ministerio si gobiernan?"),
-    (1500, GUEST, f"{SECOND_s16a2} se lo aseguro"),
+    (1500, GUEST, f"{NO_MINISTRY} se lo aseguro"),
     (1790, HOST, "Muchas gracias por venir y buenas noches"),
 ]
 
 
-class FakeTranscript_s16a2:
-    def __init__(self, lines):
-        self.lines = lines
-
-    def fetch(self, video_id):
-        segments = [Segment(t=start + i * 0.5, text=w, speaker=voice)
-                    for start, voice, text in self.lines for i, w in enumerate(text.split())]
-        return Transcript(segments=segments, published_at="2026-11-10", speakers={HOST: "Presentadora", GUEST: "Invitado"})
-
-
-class FakeClaude_s16a2:
+class PositionsModel:
     def __init__(self, positions):
         self.positions = positions
         self.calls = []  # (part text, text before the PART)
@@ -572,8 +487,8 @@ class FakeClaude_s16a2:
         head, _, part = prompt.rpartition("PART:")
         self.calls.append((part, head))
         contradictions = []
-        if SECOND_s16a2 in part and LINE in head:
-            contradictions.append({"quote": SECOND_s16a2, "earlier": FIRST_s16a2, "speaker": "Invitado",
+        if NO_MINISTRY in part and LINE in head:
+            contradictions.append({"quote": NO_MINISTRY, "earlier": KEEP_MINISTRY, "speaker": "Invitado",
                                    "earlier_speaker": "Invitado", "confidence": 0.9,
                                    "reason": "A las 3:00 dijo que no quitaría el ministerio y ahora que no habrá."})
         return {"flags": [], "claims": [], "questions": [], "context": [], "contradictions": contradictions,
@@ -584,20 +499,20 @@ class FakeClaude_s16a2:
         return next(head for part, head in self.calls if words in part)
 
 
-def analyse_s16a2(home, from_t, lines=LINES_s16a2, positions=POSITIONS):
-    claude = FakeClaude_s16a2(positions)
-    run_analysis("igualdad", from_t, transcript=FakeTranscript_s16a2(lines), llm=claude, home=home)
+def analyse_ministry(home, from_t, lines=MINISTRY_LINES, positions=POSITIONS):
+    claude = PositionsModel(positions)
+    run_analysis("igualdad", from_t, transcript=FakeTranscript(spoken(lines), speakers=VOICES), llm=claude, home=home)
     data = json.loads((home / "videos" / "igualdad.json").read_text())
     return [f for f in data["flags"] if f["type"] == "contradiction"], claude
 
 
 def test_positions_ledger(tmp_path, monkeypatch):
     monkeypatch.setattr(scheduler, "PARALLEL", 1)
-    found, claude = analyse_s16a2(tmp_path / "from-start", 0)
+    found, claude = analyse_ministry(tmp_path / "from-start", 0)
 
     # Case 1 · the part at 25:00, after the part with 3:00 is done → its prompt lists the guest's 3:00 position with
     # its minute, and the 24:10 one
-    head = claude.head_of(SECOND_s16a2)
+    head = claude.head_of(NO_MINISTRY)
     assert LINE in head, head
     assert OTHER_LINE in head, head
 
@@ -606,27 +521,27 @@ def test_positions_ledger(tmp_path, monkeypatch):
     assert len(found) == 1, found
     assert found[0]["t"] == 1500.0
     assert found[0]["speaker"] == "Invitado"
-    assert found[0]["related"] == {"t": 180.0, "quote": FIRST_s16a2}
+    assert found[0]["related"] == {"t": 180.0, "quote": KEEP_MINISTRY}
 
     # Case 3 · the positions come out of the part tool calls → one Claude tool call per part, no extra one
-    assert len(claude.calls) == len(scheduler.plan(FakeTranscript_s16a2(LINES_s16a2).fetch("igualdad"), 0))
+    assert len(claude.calls) == len(scheduler.plan(FakeTranscript(spoken(MINISTRY_LINES), speakers=VOICES).fetch("igualdad"), 0))
 
     # Case 4 · the playback starts at 24:00, so the part with 3:00 is not done when the part at 25:00 starts → its
     # list holds the 24:10 position of a finished part, not the 3:00 one, and no contradiction is flagged
-    found, claude = analyse_s16a2(tmp_path / "from-24", 1440)
-    head = claude.head_of(SECOND_s16a2)
+    found, claude = analyse_ministry(tmp_path / "from-24", 1440)
+    head = claude.head_of(NO_MINISTRY)
     assert OTHER_LINE in head, head
     assert LINE not in head, head
     assert found == [], found
 
     # Case 5 · the part with 3:00 runs last → it never lists a position stated later in the video
-    assert OTHER_LINE not in claude.head_of(FIRST_s16a2)
+    assert OTHER_LINE not in claude.head_of(KEEP_MINISTRY)
 
     # Case 6 · a 140-minute talk with one position per part → the last part gets at most 60 lines, the newest
     # position on a line of its own and the oldest one merged, not lost
     talk = [(60 + 120 * k, GUEST, f"posición número {k} del invitado") for k in range(70)]
     summaries = {text: f"defiende la posición {k}" for k, (_, _, text) in enumerate(talk)}
-    _, claude = analyse_s16a2(tmp_path / "long", 0, lines=talk, positions=summaries)
+    _, claude = analyse_ministry(tmp_path / "long", 0, lines=talk, positions=summaries)
     head = claude.head_of(talk[-1][2])
     listed = [line for line in head.splitlines() if re.match(r"Invitado \(\d+:\d\d", line)]
     assert 1 <= len(listed) <= 60, len(listed)
@@ -655,16 +570,16 @@ def test_positions_ledger(tmp_path, monkeypatch):
 # conversation run keeps the helper's parallel setting. A temporary helper home per run.
 
 FIRST = "no vamos a subir el IVA de la luz"
-SECOND_s18a2 = "vamos a subir el IVA de la luz este mismo año"
-STATEMENTS = {60: FIRST, 1080: SECOND_s18a2}
+RAISE_IVA = "vamos a subir el IVA de la luz este mismo año"
+STATEMENTS = {60: FIRST, 1080: RAISE_IVA}
 
 
 def line(t):
     return STATEMENTS.get(t, f"frase número {t} del programa")
 
 
-LINES_s18a2 = [(t, GUEST if t in STATEMENTS or t % 60 else HOST, line(t)) for t in range(0, 1200, 30)]
-NUMBERED = {t: text for t, _, text in LINES_s18a2 if t not in STATEMENTS}
+IVA_LINES = [(t, GUEST if t in STATEMENTS or t % 60 else HOST, line(t)) for t in range(0, 1200, 30)]
+NUMBERED = {t: text for t, _, text in IVA_LINES if t not in STATEMENTS}
 
 FAKE_CLAUDE = """\
 import json, os, sys
@@ -704,14 +619,7 @@ print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "ap
 """
 
 
-class FakeTranscript_s18a2:
-    def fetch(self, video_id):
-        segments = [Segment(t=start + i * 0.5, text=w, speaker=voice)
-                    for start, voice, text in LINES_s18a2 for i, w in enumerate(text.split())]
-        return Transcript(segments=segments, published_at="2026-11-10", speakers={HOST: "Presentadora", GUEST: "Invitado"})
-
-
-def analyse_s18a2(tmp_path, monkeypatch, mode):
+def analyse_iva(tmp_path, monkeypatch, mode):
     run_dir = tmp_path / mode
     (run_dir / "sessions").mkdir(parents=True)
     bin_dir = run_dir / "bin"
@@ -724,11 +632,11 @@ def analyse_s18a2(tmp_path, monkeypatch, mode):
     monkeypatch.setenv("FAKE_CLAUDE_SESSIONS", str(run_dir / "sessions"))
     monkeypatch.setenv("FAKE_CLAUDE_LOG", str(log))
     monkeypatch.setenv("FIRST", FIRST)
-    monkeypatch.setenv("SECOND", SECOND_s18a2)
+    monkeypatch.setenv("SECOND", RAISE_IVA)
     home = run_dir / "home"
     home.mkdir()
-    run_analysis("iva", 0, transcript=FakeTranscript_s18a2(), llm=ClaudeCLI(home, model="opus"), home=home,
-                 context_mode=mode)
+    run_analysis("iva", 0, transcript=FakeTranscript(spoken(IVA_LINES), speakers=VOICES),
+                 llm=ClaudeCLI(home, model="opus"), home=home, context_mode=mode)
     data = json.loads((home / "videos" / "iva.json").read_text())
     assert data["status"] == "done", data
     readings = [json.loads(x) for x in log.read_text().splitlines()]
@@ -741,13 +649,13 @@ def part_start(reading):
     return min(t for t, text in [*NUMBERED.items(), *STATEMENTS.items()] if text in part)
 
 
-def contradiction_s18a2(data):
+def contradictions_of(data):
     return [(f["t"], f["related"]["t"]) for f in data["flags"] if f["type"] == "contradiction"]
 
 
 def test_short_window(tmp_path, monkeypatch):
     monkeypatch.setattr(scheduler, "PARALLEL", 1)
-    data, readings = analyse_s18a2(tmp_path, monkeypatch, "window")
+    data, readings = analyse_iva(tmp_path, monkeypatch, "window")
 
     # Case 1 · every part reading → holds the numbered lines of the 3 minutes before its part, and none older
     assert len(readings) > 5, len(readings)
@@ -767,11 +675,11 @@ def test_short_window(tmp_path, monkeypatch):
         assert "Invitado (1:00): no subirá el IVA de la luz" in r["prompt"], part_start(r)
 
     # Case 3 · the guest says the opposite at 18:00 → a contradiction flag at 18:00 that points to 1:00
-    assert contradiction_s18a2(data) == [(1080.0, 60.0)], contradiction_s18a2(data)
+    assert contradictions_of(data) == [(1080.0, 60.0)], contradictions_of(data)
 
 
 def test_long_conversation(tmp_path, monkeypatch):
-    data, readings = analyse_s18a2(tmp_path, monkeypatch, "conversation")
+    data, readings = analyse_iva(tmp_path, monkeypatch, "conversation")
 
     # Case 4 · the parts → read in time order, the first one starts a session and every other one resumes it
     starts = [part_start(r) for r in readings]
@@ -788,7 +696,7 @@ def test_long_conversation(tmp_path, monkeypatch):
         assert "(1:00)" not in r["prompt"], start
 
     # Case 6 · the guest says the opposite at 18:00 → a contradiction flag at 18:00 that points to 1:00
-    assert contradiction_s18a2(data) == [(1080.0, 60.0)], contradiction_s18a2(data)
+    assert contradictions_of(data) == [(1080.0, 60.0)], contradictions_of(data)
     print("PASS S18 A2 · A part gets its context as a short window or as one long conversation")
 
 
@@ -803,18 +711,10 @@ def test_long_conversation(tmp_path, monkeypatch):
 # test waits until the flag file says done. A temporary helper home.
 
 VIDEO = "conversa1"
-LINES_s19a1 = [Segment(t=float(t), text=f"frase número {t} del programa") for t in range(0, 360, 10)]
+NUMBERED_LINES = [Segment(t=float(t), text=f"frase número {t} del programa") for t in range(0, 360, 10)]
 
 
-class FakeYouTube:
-    def __init__(self, *args):
-        pass
-
-    def fetch(self, video_id):
-        return Transcript(segments=LINES_s19a1, published_at="2026-11-10")
-
-
-class FakeClaude_s19a1:
+class SessionModel:
     sessions = []
 
     def __init__(self, *args, **kwargs):
@@ -823,7 +723,7 @@ class FakeClaude_s19a1:
     def complete(self, prompt, schema, tools=()):
         if "flags" in schema["properties"]:
             session = getattr(prompt, "session", None)
-            FakeClaude_s19a1.sessions.append(session and session.id)
+            SessionModel.sessions.append(session and session.id)
             if session:
                 session.turns += 1
             return {"flags": [], "claims": [], "questions": [], "contradictions": [], "positions": [], "context": []}
@@ -833,9 +733,9 @@ class FakeClaude_s19a1:
 def test_parts_continue_one_conversation(tmp_path, monkeypatch):
     monkeypatch.delenv("FACT_CHECK_API_KEY", raising=False)
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.setattr(server, "YouTube", FakeYouTube)
-    monkeypatch.setattr(server, "ClaudeCLI", FakeClaude_s19a1)
-    FakeClaude_s19a1.sessions = []
+    monkeypatch.setattr(server, "YouTube", lambda *args: FakeTranscript(NUMBERED_LINES))
+    monkeypatch.setattr(server, "ClaudeCLI", SessionModel)
+    SessionModel.sessions = []
     helper = server.Helper(tmp_path)
 
     # Case 1 · the extension's first request → the analysis of the whole short video ends done
@@ -848,9 +748,9 @@ def test_parts_continue_one_conversation(tmp_path, monkeypatch):
     assert data["status"] == "done", data
 
     # Case 2 · every part reading → names a conversation, and all name the same one
-    assert len(FakeClaude_s19a1.sessions) >= 3, FakeClaude_s19a1.sessions
-    assert None not in FakeClaude_s19a1.sessions, FakeClaude_s19a1.sessions
-    assert len(set(FakeClaude_s19a1.sessions)) == 1, FakeClaude_s19a1.sessions
+    assert len(SessionModel.sessions) >= 3, SessionModel.sessions
+    assert None not in SessionModel.sessions, SessionModel.sessions
+    assert len(set(SessionModel.sessions)) == 1, SessionModel.sessions
 
 
 # S26 A2 · An English video is read as English
@@ -891,8 +791,8 @@ def test_english_video(tmp_path, monkeypatch):
         "FAIL S26 A2 · the part reading does not ask for an English conversation and English queries"
 
     # Case 3 · the published fact-check search → in English; the figure search → the country's sources, not Spain's
-    assert FactCheck.searches and {lang for _, lang in FactCheck.searches} == {"en"}, \
-        f"FAIL S26 A2 · fact-check searches {FactCheck.searches}"
+    assert NoPublishedChecks.searches and {lang for _, lang in NoPublishedChecks.searches} == {"en"}, \
+        f"FAIL S26 A2 · fact-check searches {NoPublishedChecks.searches}"
     search = next(r for r in done if r["answer"] == "evidence")
     assert "WebSearch" in search["tools"], "FAIL S26 A2 · the search reading has no web search"
     assert "Search in English" in text(search) and "country" in text(search), \
@@ -921,7 +821,7 @@ def test_english_video(tmp_path, monkeypatch):
 # file with GET until it is no longer running. What the extension sends is checked in
 # tests/extension/start.test.ts (S26 A3).
 
-def analyse_s26a3(home, video: str, query: str) -> dict:
+def analyse_over_http(home, video: str, query: str) -> dict:
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(home)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{httpd.server_port}/videos/{video}"
@@ -946,7 +846,7 @@ def by_kind(log) -> dict:
 
 def test_spanish_viewer_of_an_english_video(tmp_path, monkeypatch):
     home, log = setup(tmp_path, monkeypatch)
-    data = analyse_s26a3(home, "enview", "&lang=es")
+    data = analyse_over_http(home, "enview", "&lang=es")
     seen = by_kind(log)
 
     # Case 1 · a Spanish viewer, an English video → reasons asked in Spanish about an English conversation
@@ -969,7 +869,7 @@ def test_spanish_viewer_of_an_english_video(tmp_path, monkeypatch):
 
 def test_english_viewer_of_a_spanish_video(tmp_path, monkeypatch):
     home, log = setup(tmp_path, monkeypatch)
-    data = analyse_s26a3(home, "esview", "&lang=en")
+    data = analyse_over_http(home, "esview", "&lang=en")
     seen = by_kind(log)
 
     # Case 3 · an English viewer, a Spanish video → reasons asked in English about a Spanish conversation
@@ -985,7 +885,7 @@ def test_english_viewer_of_a_spanish_video(tmp_path, monkeypatch):
 
 def test_no_language_sent(tmp_path, monkeypatch):
     home, log = setup(tmp_path, monkeypatch)
-    data = analyse_s26a3(home, "enview", "")
+    data = analyse_over_http(home, "enview", "")
 
     # Case 4 · no language sent → the reasons follow the video's language
     assert (data.get("lang"), data.get("spoken")) == ("en", "en"), \
@@ -1008,7 +908,7 @@ def test_no_language_sent(tmp_path, monkeypatch):
 # each reading and answers by the JSON schema it gets; its screen says "no" only to the part that holds the greeting.
 # The `codex` command fails. A temporary helper home per run.
 
-def analyse_s29a1(tmp_path, monkeypatch, name: str, config: str | None = None):
+def analyse_screen(tmp_path, monkeypatch, name: str, config: str | None = None):
     run = tmp_path / name
     home = run / "home"
     home.mkdir(parents=True)
@@ -1021,11 +921,11 @@ def analyse_s29a1(tmp_path, monkeypatch, name: str, config: str | None = None):
 
 
 def test_screen_skips_small_talk(tmp_path, monkeypatch):
-    fake_video(monkeypatch)
+    fake_video(monkeypatch, THREE_PARTS)
 
     # Case 1 · no settings → one screen reading per part by haiku, with no tool; the greeting part is logged as
     # skipped (read false, with the screen's reason) and the two others as read
-    data, usage, readings = analyse_s29a1(tmp_path, monkeypatch, "default")
+    data, usage, readings = analyse_screen(tmp_path, monkeypatch, "default")
     assert data["status"] == "done", data
     screens = sorted((u["chunk_start"], u["model"], u["read"]) for u in usage if u["step"] == "screen")
     assert screens == [(0, "haiku", False), (30, "haiku", True), (150, "haiku", True)], \
@@ -1046,20 +946,20 @@ def test_screen_skips_small_talk(tmp_path, monkeypatch):
 
     # Case 4 · the screen reading fails → every part gets the full reading
     monkeypatch.setenv("FAKE_SCREEN_FAILS", "1")
-    data, usage, _ = analyse_s29a1(tmp_path, monkeypatch, "failing")
+    data, usage, _ = analyse_screen(tmp_path, monkeypatch, "failing")
     monkeypatch.delenv("FAKE_SCREEN_FAILS")
     assert data["status"] == "done", data
     assert sorted(u["chunk_start"] for u in usage if u["step"] == "analyze_chunk") == [0, 30, 150], usage
 
     # Case 5 · the screen answers with no `read` at all → every part gets the full reading
     monkeypatch.setenv("FAKE_SCREEN_ODD", "1")
-    data, usage, _ = analyse_s29a1(tmp_path, monkeypatch, "odd")
+    data, usage, _ = analyse_screen(tmp_path, monkeypatch, "odd")
     monkeypatch.delenv("FAKE_SCREEN_ODD")
     assert data["status"] == "done", data
     assert sorted(u["chunk_start"] for u in usage if u["step"] == "analyze_chunk") == [0, 30, 150], usage
 
     # Case 6 · `screen = false` in the settings (for a measurement) → no screen reading, every part read in full
-    data, usage, readings = analyse_s29a1(tmp_path, monkeypatch, "off", "screen = false\n")
+    data, usage, readings = analyse_screen(tmp_path, monkeypatch, "off", "screen = false\n")
     assert data["status"] == "done", data
     assert not [r for r in readings if r["kind"] == "screen"], readings
     assert sorted(u["chunk_start"] for u in usage if u["step"] == "analyze_chunk") == [0, 30, 150], usage
@@ -1069,27 +969,22 @@ def test_screen_skips_small_talk(tmp_path, monkeypatch):
 # A fallacy that the model names outside the list becomes a flag of the listed label it is a form of.
 
 QUOTE = "el partido socialista en la oposición no pidió la dimisión de ana pastor"
-OTHER_closest_label = "esto es como lo que hacían en los años treinta"
+ANALOGY = "esto es como lo que hacían en los años treinta"
 
 
-class FakeTranscript_closest_label:
-    def fetch(self, video_id):
-        words = f"{QUOTE} {OTHER_closest_label}".split()
-        return Transcript(segments=[Segment(t=i * 0.5, text=w) for i, w in enumerate(words)], published_at=None)
-
-
-class FakeClaude_closest_label:
+class ClosestLabelModel:
     def complete(self, prompt, schema, tools=()):
         return {"flags": [
             {"quote": QUOTE, "label": "whataboutism", "closest": "tu_quoque", "speaker": "Invitado",
              "reason": "Responde con lo que hizo el otro partido.", "confidence": 0.8},
-            {"quote": OTHER_closest_label, "label": "false_analogy", "closest": None, "speaker": "Invitado",
+            {"quote": ANALOGY, "label": "false_analogy", "closest": None, "speaker": "Invitado",
              "reason": "Compara dos épocas sin base.", "confidence": 0.7},
         ], "claims": []}
 
 
 def test_closest_listed_label(tmp_path):
-    run_analysis("closest", 0, transcript=FakeTranscript_closest_label(), llm=FakeClaude_closest_label(), home=tmp_path, thresholds={})
+    run_analysis("closest", 0, transcript=FakeTranscript(spoken([(0, f"{QUOTE} {ANALOGY}")]), published_at=None),
+                 llm=ClosestLabelModel(), home=tmp_path, thresholds={})
     flags = json.loads((tmp_path / "videos" / "closest.json").read_text())["flags"]
     assert [(f["label"], f["quote"]) for f in flags] == [("tu_quoque", QUOTE)]
     names = [json.loads(line)["label"] for line in (tmp_path / "candidates.log").read_text().splitlines()]
@@ -1098,16 +993,10 @@ def test_closest_listed_label(tmp_path):
 
 # A conversation whose context passes 150k tokens goes on in a new session, which gets the positions list.
 
-LINES_session_rollover = [(0, "Buenas noches y bienvenidos"), (60, FIRST), (200, "frase del programa"), (330, "otra frase más")]
+ROLLOVER_LINES = [(0, "Buenas noches y bienvenidos"), (60, FIRST), (200, "frase del programa"), (330, "otra frase más")]
 
 
-class FakeTranscript_session_rollover:
-    def fetch(self, video_id):
-        return Transcript(segments=[Segment(t=float(t + i * 0.5), text=w) for t, text in LINES_session_rollover
-                                    for i, w in enumerate(text.split())], published_at="2026-11-10")
-
-
-class FakeClaude_session_rollover:
+class RolloverModel:
     """Grows the session as Claude Code does, by 100k tokens a reading."""
 
     def __init__(self):
@@ -1124,8 +1013,9 @@ class FakeClaude_session_rollover:
 
 
 def test_new_session_carries_positions(tmp_path):
-    claude = FakeClaude_session_rollover()
-    run_analysis("largo", 0, transcript=FakeTranscript_session_rollover(), llm=claude, home=tmp_path, context_mode="conversation")
+    claude = RolloverModel()
+    run_analysis("largo", 0, transcript=FakeTranscript(spoken(ROLLOVER_LINES)), llm=claude, home=tmp_path,
+                 context_mode="conversation")
     ids = [r[0] for r in claude.readings]
     assert ids[0] == ids[1] != ids[2] == ids[3], ids
     assert claude.readings[2][1] == 0

@@ -13,15 +13,15 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from chat_fakes import FakeMessagesAPI, fail_clis, fake_video
 from fact_checker import cli, install, server
-from fact_checker.adapters.youtube import parse_json3
 from fact_checker.core import scheduler
 from fact_checker.core.flags import Segment, Transcript
 from fact_checker.core.scheduler import plan
 from fact_checker.server import handler, Helper, run_analysis
 from fact_checker.store import Store
+from interview_fakes import fail_clis, FakeMessagesAPI, TWO_PARTS
 from machine_fakes import Foreign, free_ports, guard, health, wait
+from video_fakes import FakeTranscript, fake_video, JSON3Captions, NoPublishedChecks
 
 
 # S1 A3 · The analysis starts where the person is watching and runs ahead
@@ -34,11 +34,6 @@ from machine_fakes import Foreign, free_ports, guard, health, wait
 # 50 ms per call, finds nothing, and counts how many calls run at the same time; a temporary helper home.
 
 HOUR = [Segment(t=float(t), text=f"frase número {t}") for t in range(0, 3600, 5)]
-
-
-class FakeTranscript_s1a3:
-    def fetch(self, video_id):
-        return Transcript(segments=HOUR, published_at="2026-11-10")
 
 
 class CountingClaude:
@@ -82,12 +77,12 @@ def test_plan_starts_at_playback_second():
 
 def test_runs_ahead_with_three_at_once(tmp_path):
     claude = CountingClaude()
-    run_analysis("hour", 3000, transcript=FakeTranscript_s1a3(), llm=claude, home=tmp_path)
+    run_analysis("hour", 3000, transcript=FakeTranscript(HOUR), llm=claude, home=tmp_path)
     data = json.loads((tmp_path / "videos" / "hour.json").read_text())
 
     # Case 5 · all parts analysed → status done, one Claude call per part
     assert data["status"] == "done"
-    assert claude.calls == len(plan(FakeTranscript_s1a3().fetch("hour"), 3000))
+    assert claude.calls == len(plan(FakeTranscript(HOUR).fetch("hour"), 3000))
 
     # Case 6 · never more than 3 calls at once, and more than one when there is work
     assert 2 <= claude.peak <= 3
@@ -111,11 +106,6 @@ def test_runs_ahead_with_three_at_once(tmp_path):
 FAKE = Path(__file__).parents[1] / "fakes" / "youtube" / "invented-claims.json3"
 
 
-class FakeTranscript:
-    def fetch(self, video_id):
-        return parse_json3(json.loads(FAKE.read_text()), published_at="2026-11-10")
-
-
 class FakeClaude:
     def complete(self, prompt, schema, tools=()):
         if "verdicts" in schema["properties"]:
@@ -127,13 +117,8 @@ class FakeClaude:
                 "claims": [{"quote": "el paro juvenil se duplicó el año pasado", "speaker": "guest", "queries": ["paro"]}]}
 
 
-class NoPublishedChecks:
-    def search(self, query, language):
-        return []
-
-
 def test_on_player_by_type(tmp_path):
-    run_analysis("claims", 0, transcript=FakeTranscript(), llm=FakeClaude(), factcheck=NoPublishedChecks(),
+    run_analysis("claims", 0, transcript=JSON3Captions(FAKE), llm=FakeClaude(), factcheck=NoPublishedChecks(),
                  home=tmp_path, thresholds={"fallacy": 0.5, "inaccuracy": 0.9})
     flags = {f["type"]: f for f in json.loads((tmp_path / "videos" / "claims.json").read_text())["flags"]}
 
@@ -215,11 +200,6 @@ def test_mark_stored(tmp_path):
 TEN_MINUTES = [Segment(t=float(t), text=f"frase número {t}") for t in range(0, 600, 5)]
 
 
-class FakeTranscript_s13a1:
-    def fetch(self, video_id):
-        return Transcript(segments=TEN_MINUTES, published_at="2026-11-10")
-
-
 class HeldClaude:
     """Finds nothing; the part whose last line is at `t` waits for `gates[t]`."""
 
@@ -247,7 +227,7 @@ def test_analysed_until(tmp_path):
     first, later = threading.Event(), threading.Event()
     claude = HeldClaude({145: first, 385: later})  # parts 30-150 and 270-390
     run = threading.Thread(target=run_analysis, args=("tenmin", 0),
-                           kwargs={"transcript": FakeTranscript_s13a1(), "llm": claude, "home": tmp_path})
+                           kwargs={"transcript": FakeTranscript(TEN_MINUTES), "llm": claude, "home": tmp_path})
     run.start()
     flag_file = tmp_path / "videos" / "tenmin.json"
     try:
@@ -346,18 +326,10 @@ def test_marks_in_flag_file(tmp_path):
 # parts run one at a time (scheduler.PARALLEL = 1). A background poller plays the extension: every 0.3 s it sends the
 # playback second, until the test closes the tab. A temporary helper home.
 
-VIDEO_s18a3 = "sesenta1"
+VIEWED = "sesenta1"
 
 
-class FakeYouTube:
-    def __init__(self, *args):
-        pass
-
-    def fetch(self, video_id):
-        return Transcript(segments=HOUR, published_at="2026-11-10")
-
-
-class FakeClaude_s18a3:
+class FollowingModel:
     starts = []
     delay = 0.05
 
@@ -367,8 +339,8 @@ class FakeClaude_s18a3:
     def complete(self, prompt, schema, tools=()):
         if "flags" in schema["properties"]:
             part = str(prompt).rpartition("PART:")[2]
-            FakeClaude_s18a3.starts.append(min(int(n) for n in re.findall(r"frase número (\d+)", part)))
-            time.sleep(FakeClaude_s18a3.delay)
+            FollowingModel.starts.append(min(int(n) for n in re.findall(r"frase número (\d+)", part)))
+            time.sleep(FollowingModel.delay)
             return {"flags": [], "claims": [], "questions": [], "contradictions": [], "positions": [], "context": []}
         return {"rulings": []}
 
@@ -383,7 +355,7 @@ class Extension:
     def poll(self):
         """A 404 before the flag file exists still tells the helper the playback second, as the extension's poll does."""
         try:
-            urllib.request.urlopen(f"{self.base}/videos/{VIDEO_s18a3}?at={self.at}").read()
+            urllib.request.urlopen(f"{self.base}/videos/{VIEWED}?at={self.at}").read()
         except urllib.error.HTTPError:
             pass
 
@@ -400,21 +372,21 @@ def wait_for(cond, timeout=15):
         if cond():
             return
         time.sleep(0.05)
-    raise AssertionError(f"timed out; parts read: {sorted(FakeClaude_s18a3.starts)}")
+    raise AssertionError(f"timed out; parts read: {sorted(FollowingModel.starts)}")
 
 
 def read_in(lo, hi):
-    return sorted(s for s in FakeClaude_s18a3.starts if lo <= s < hi)
+    return sorted(s for s in FollowingModel.starts if lo <= s < hi)
 
 
 def test_follow_viewer(tmp_path, monkeypatch):
-    monkeypatch.setattr(server, "YouTube", FakeYouTube)
-    monkeypatch.setattr(server, "ClaudeCLI", FakeClaude_s18a3)
+    monkeypatch.setattr(server, "YouTube", lambda *args: FakeTranscript(HOUR))
+    monkeypatch.setattr(server, "ClaudeCLI", FollowingModel)
     monkeypatch.delenv("FACT_CHECK_API_KEY", raising=False)
     monkeypatch.delenv("HF_TOKEN", raising=False)
     monkeypatch.setattr(scheduler, "SILENCE", 1.5)
     monkeypatch.setattr(scheduler, "PARALLEL", 1)
-    FakeClaude_s18a3.starts = []
+    FollowingModel.starts = []
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(tmp_path)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
@@ -423,26 +395,26 @@ def test_follow_viewer(tmp_path, monkeypatch):
         # Case 1 · the person starts at 10:00 and stays there → parts from 10:00 up to 20:00 (30 s, then 2 minutes),
         # none before 10:00 and none that starts after 20:00
         tab.at = 600
-        urllib.request.urlopen(urllib.request.Request(f"{base}/videos/{VIDEO_s18a3}?from=600", method="POST")).read()
+        urllib.request.urlopen(urllib.request.Request(f"{base}/videos/{VIEWED}?from=600", method="POST")).read()
         tab.open.set()
-        wait_for(lambda: 1110 in FakeClaude_s18a3.starts)
+        wait_for(lambda: 1110 in FollowingModel.starts)
         time.sleep(0.5)
-        assert sorted(FakeClaude_s18a3.starts) == [600, 630, 750, 870, 990, 1110], sorted(FakeClaude_s18a3.starts)
+        assert sorted(FollowingModel.starts) == [600, 630, 750, 870, 990, 1110], sorted(FollowingModel.starts)
 
         # Case 2 · playback moves to 15:00 → the parts go on up to 25:00, and no further
         tab.at = 900
-        wait_for(lambda: 1470 in FakeClaude_s18a3.starts)
+        wait_for(lambda: 1470 in FollowingModel.starts)
         time.sleep(0.5)
         assert read_in(1200, 3600) == [1230, 1350, 1470], read_in(1200, 3600)
 
         # Case 3 · the person jumps to 45:00 and the tab closes right after → the next parts start at 45:00; after
         # the silence the analysis pauses before the parts up to 55:00 are all read
-        FakeClaude_s18a3.delay = 0.5
+        FollowingModel.delay = 0.5
         tab.open.clear()
         time.sleep(0.4)
         tab.at = 2700
         tab.poll()
-        wait_for(lambda: 2700 in FakeClaude_s18a3.starts)
+        wait_for(lambda: 2700 in FollowingModel.starts)
         time.sleep(scheduler.SILENCE + 1)
         paused = read_in(2700, 3600)
         time.sleep(1.5)
@@ -451,27 +423,27 @@ def test_follow_viewer(tmp_path, monkeypatch):
 
         # Case 4 · the extension asks again → the analysis goes on up to 55:00
         tab.open.set()
-        wait_for(lambda: 3210 in FakeClaude_s18a3.starts)
+        wait_for(lambda: 3210 in FollowingModel.starts)
         assert read_in(2700, 3600) == [2700, 2730, 2850, 2970, 3090, 3210], read_in(2700, 3600)
 
         # Case 5 · the stretch skipped by the jump → 25:00-45:00 stays unanalysed
-        FakeClaude_s18a3.delay = 0.05
+        FollowingModel.delay = 0.05
         assert read_in(1500, 2700) == [], read_in(1500, 2700)
 
         # Case 6 · the person goes back to 2:00 → the parts from 2:00 are analysed, none before it, and no part
         # from 10:00 on is read again
-        later = sorted(s for s in FakeClaude_s18a3.starts if s >= 600)
+        later = sorted(s for s in FollowingModel.starts if s >= 600)
         tab.at = 120
-        wait_for(lambda: 510 in FakeClaude_s18a3.starts)
+        wait_for(lambda: 510 in FollowingModel.starts)
         time.sleep(0.5)
         assert read_in(0, 600) == [120, 150, 270, 390, 510], read_in(0, 600)
-        assert sorted(s for s in FakeClaude_s18a3.starts if s >= 600) == later, read_in(600, 3600)
+        assert sorted(s for s in FollowingModel.starts if s >= 600) == later, read_in(600, 3600)
         assert read_in(1500, 2700) == [], read_in(1500, 2700)
     finally:
         tab.open.clear()
         httpd.shutdown()
 
-    data = json.loads((tmp_path / "videos" / f"{VIDEO_s18a3}.json").read_text())
+    data = json.loads((tmp_path / "videos" / f"{VIEWED}.json").read_text())
     assert data["status"] == "running", data["status"]
     print("PASS S18 A3 · The analysis follows what the person watches")
 
@@ -494,7 +466,7 @@ class FakeLLM:
 
 
 def on_player(home: Path) -> bool:
-    server.run_analysis("claims", 0, transcript=FakeTranscript(), llm=FakeLLM(), home=home)
+    server.run_analysis("claims", 0, transcript=JSON3Captions(FAKE), llm=FakeLLM(), home=home)
     flags = json.loads((home / "videos" / "claims.json").read_text())["flags"]
     [fallacy] = [f for f in flags if f["type"] == "fallacy"]
     assert fallacy["confidence"] == 0.6, fallacy
@@ -537,7 +509,7 @@ def test_bars_per_provider(tmp_path, monkeypatch):
 
 def test_port_fallback(tmp_path, monkeypatch, capsys):
     fail_clis(tmp_path, monkeypatch)
-    fake_video(monkeypatch)
+    fake_video(monkeypatch, TWO_PARTS)
     guard(monkeypatch)
     first = free_ports()
     home = tmp_path / "helper"
@@ -614,19 +586,11 @@ def test_port_fallback(tmp_path, monkeypatch, capsys):
 # An analysis started over HTTP follows the extension's playback second and pauses about ten minutes ahead of it when
 # nobody polls; the command must not stop there.
 
-VIDEO_analyze_whole_video = "entera1234"
+WHOLE = "entera1234"
 LINES = [Segment(t=float(t), text=f"frase número {t} del programa") for t in range(0, 1500, 10)]  # 25 minutes
 
 
-class FakeYouTube_analyze_whole_video:
-    def __init__(self, *args):
-        pass
-
-    def fetch(self, video_id):
-        return Transcript(segments=LINES, published_at="2026-11-10")
-
-
-class FakeClaude_analyze_whole_video:
+class NothingModel:
     def __init__(self, *args, **kwargs):
         pass
 
@@ -640,13 +604,13 @@ def test_analyze_reads_past_the_horizon(tmp_path, monkeypatch):
     monkeypatch.setenv("FACT_CHECKER_HOME", str(tmp_path))
     monkeypatch.delenv("FACT_CHECK_API_KEY", raising=False)
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.setattr(server, "YouTube", FakeYouTube_analyze_whole_video)
-    monkeypatch.setattr(server, "ClaudeCLI", FakeClaude_analyze_whole_video)
-    monkeypatch.setattr(sys, "argv", ["fact-checker", "analyze", f"https://www.youtube.com/watch?v={VIDEO_analyze_whole_video}&t=60s"])
+    monkeypatch.setattr(server, "YouTube", lambda *args: FakeTranscript(LINES))
+    monkeypatch.setattr(server, "ClaudeCLI", NothingModel)
+    monkeypatch.setattr(sys, "argv", ["fact-checker", "analyze", f"https://www.youtube.com/watch?v={WHOLE}&t=60s"])
 
     cli.main()
 
-    data = json.loads((tmp_path / "videos" / f"{VIDEO_analyze_whole_video}.json").read_text())
+    data = json.loads((tmp_path / "videos" / f"{WHOLE}.json").read_text())
     assert data["status"] == "done", data
     assert data["analysed_until"] >= LINES[-1].t
 
@@ -669,7 +633,7 @@ KEY = "sk-ant-invented-s40-key-0123456789"
 # extension side is checked in s40-a3-settings-opens-keys.test.ts.
 
 def test_key_page(tmp_path, monkeypatch, capsys):
-    fake_video(monkeypatch)
+    fake_video(monkeypatch, TWO_PARTS)
     fail_clis(tmp_path, monkeypatch)
     guard(monkeypatch)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from fact_checker import cli, install
 
-HELPER_SRC = Path(__file__).parents[2] / "src" / "helper"
+HELPER_SRC = Path(__file__).resolve().parents[2] / "src" / "helper"
 REAL_PORTS = range(8765, 8770)
 
 FAKE_CLAUDE = """\

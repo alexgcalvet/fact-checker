@@ -11,7 +11,7 @@ import threading
 import time
 from pathlib import Path
 
-from fact_checker.core.flags import Segment, Transcript
+from video_fakes import FakeTranscript, spoken
 
 HOST_LINE = "Buenas noches la oposición no tiene autoridad para hablar de nada"
 HOST_QUOTE = "la oposición no tiene autoridad para hablar"
@@ -27,14 +27,7 @@ TURNS = [{"start": 0.0, "end": 10.0, "speaker": "SPEAKER_00"}, {"start": 11.0, "
          {"start": 200.0, "end": 260.0, "speaker": "SPEAKER_00"}, {"start": 261.0, "end": 700.0, "speaker": "SPEAKER_01"}]
 NAMES = {"speakers": [{"voice": "SPEAKER_00", "name": "Presentadora"}, {"voice": "SPEAKER_01", "name": "Invitado"}]}
 PART_S = 0.2
-
-
-class FakeTranscript:
-    """Captions with no voices, as YouTube gives them."""
-
-    def fetch(self, video_id):
-        return Transcript(segments=[Segment(t=start + i * 0.5, text=w) for start, line in LINES
-                                    for i, w in enumerate(line.split())], published_at="2026-11-10")
+CAPTIONS = FakeTranscript(spoken(LINES))  # with no voices, as YouTube gives them
 
 
 class SlowVoices:
@@ -49,7 +42,7 @@ class SlowVoices:
         return TURNS
 
 
-class FakeModel:
+class GuessingModel:
     """Answers the speakers reading with the two names, and each part reading after 0.2 s with an ad hominem for each
     known line in its PART, pinned on the name that a reading of the text alone gives. Records each PART it reads."""
 

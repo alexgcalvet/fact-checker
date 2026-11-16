@@ -6,9 +6,7 @@ the guest that the person marks unfair (UNFAIR_QUOTE) and a serious flag of the 
 MARTA, JORGE and NURIA are the three interviews of the board «La entrevista de las 9». Every name, quote and figure is
 invented.
 """
-import re
 import sys
-from html import unescape
 
 from fact_checker import cli, server
 from fact_checker.store import Store
@@ -18,7 +16,7 @@ UNFAIR_QUOTE = "esto lo dicen todos los estudios serios"
 HOST_QUOTE = "usted nunca contesta a nada de lo que le pregunto"
 
 
-def flag(n, speaker, type, label, verdict="keep", severity=None):
+def numbered_flag(n, speaker, type, label, verdict="keep", severity=None):
     judge = {"verdict": verdict, "reason": "Regla inventada."} | ({"severity": severity} if severity else {})
     return {"id": f"{label}-{n}", "t": 60.0 * n, "speaker": speaker, "quote": f"frase inventada {n}", "type": type,
             "label": label, "reason": "Motivo inventado.", "confidence": 0.9, "related": None, "note": None,
@@ -33,24 +31,24 @@ def interview(video_id, guest, person, *, spoken_s, claims, asked, false, mislea
     """One interview of `guest`. The first `serious` figures (false first) are serious; when there are fewer figures,
     the rest of the serious flags are uses of `device`. Without `voices` the file has no `people` and no host."""
     labels = ["false"] * false + ["misleading"] * misleading
-    flags = [flag(i, guest, "inaccuracy", label, severity="serious" if i < serious else "moderate")
+    flags = [numbered_flag(i, guest, "inaccuracy", label, severity="serious" if i < serious else "moderate")
              for i, label in enumerate(labels)]
     n = len(flags)
-    flags += [flag(n + i, guest, "inaccuracy", "false", verdict="nitpick") for i in range(nitpicks)]
+    flags += [numbered_flag(n + i, guest, "inaccuracy", "false", verdict="nitpick") for i in range(nitpicks)]
     n = len(flags)
-    flags += [flag(n + i, guest, "fallacy", device, severity="serious" if len(labels) + i < serious else "minor")
+    flags += [numbered_flag(n + i, guest, "fallacy", device, severity="serious" if len(labels) + i < serious else "minor")
               for i in range(repeats)]
     if other_device:
-        flags.append(flag(len(flags), guest, "fallacy", other_device, severity="minor"))
+        flags.append(numbered_flag(len(flags), guest, "fallacy", other_device, severity="minor"))
     n = len(flags)
-    flags += [flag(n + i, guest, "question", "dodged", severity="minor") for i in range(dodged)]
-    unfair = flag(len(flags), guest, "fallacy", device, severity="serious") | {"quote": UNFAIR_QUOTE}
+    flags += [numbered_flag(n + i, guest, "question", "dodged", severity="minor") for i in range(dodged)]
+    unfair = numbered_flag(len(flags), guest, "fallacy", device, severity="serious") | {"quote": UNFAIR_QUOTE}
     flags.append(unfair)
     data = {"video_id": video_id, "published_at": published_at, "status": "done", "stop_reason": None, "lang": "es",
             "spoken": "es", "title": title, "channel": "Canal inventado", "duration": spoken_s + 1200.0,
             "claims": {guest: claims}, "questions": {guest: asked}}
     if voices:
-        flags.append(flag(len(flags), HOST, "fallacy", "ad_hominem", severity="serious") | {"quote": HOST_QUOTE})
+        flags.append(numbered_flag(len(flags), HOST, "fallacy", "ad_hominem", severity="serious") | {"quote": HOST_QUOTE})
         data |= {"speakers": {"SPEAKER_00": HOST, "SPEAKER_01": guest},
                  "people": {HOST: {"role": "host", "person": HOST, "spoken_s": 1200, "set_by": "llm"},
                             guest: {"role": "guest", "spoken_s": spoken_s, "set_by": "llm"}
@@ -101,12 +99,6 @@ def compare(home, out, monkeypatch, capsys, *args) -> tuple[int, str]:
         code = stop.code if isinstance(stop.code, int) else 1
     printed = capsys.readouterr()
     return code, printed.out + printed.err
-
-
-def visible(html: str) -> str:
-    """The text of a page as a reader sees it: no style, script or tags, one space between words."""
-    html = re.sub(r"<(style|script)\b.*?</\1>", " ", html, flags=re.S)
-    return " ".join(unescape(re.sub(r"<[^>]+>", " ", html)).split())
 
 
 def column(card: str, name: str, names: list[str]) -> str:

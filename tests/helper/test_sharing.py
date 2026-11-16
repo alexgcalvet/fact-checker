@@ -9,15 +9,14 @@ import tomllib
 import urllib.error
 import urllib.request
 from datetime import date
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
 
-from chat_fakes import fail_clis
 from fact_checker import analyses, cli, server
+from fake_servers import FakeCollector, TOKEN
+from interview_fakes import fail_clis
 from language_fakes import readings, setup
 from marks_fakes import (
-    FakeCollector,
     FALLACY,
     FIGURE,
     home_with_flags,
@@ -26,10 +25,9 @@ from marks_fakes import (
     OLD_VIDEO,
     request,
     start_helper,
-    TOKEN,
     VIDEO,
 )
-from shared_analysis_fakes import ANALYSIS, FakeCollector as FakeCollector_shared_analysis, SHARED_VIDEO
+from shared_analysis_fakes import ANALYSIS, SHARED_VIDEO
 
 
 # S24 A4 · The owner pulls the new rows with the admin token
@@ -75,7 +73,7 @@ def test_feedback_pull(tmp_path, monkeypatch, capsys):
         # Case 1 · no token → the collector answers 401; the pull names the token and exits 1
         code, out = run(monkeypatch, capsys, "feedback", "pull")
         assert code == 1 and "FEEDBACK_ADMIN_TOKEN" in out, (code, out)
-        assert collector.reads[-1]["auth"] is None
+        assert collector.requests[-1]["auth"] is None
 
         # Case 2 · a wrong token → 401; the pull names the token, never prints its value, and exits 1
         (home / ".env").write_text("FEEDBACK_ADMIN_TOKEN=wrong-token\n")
@@ -90,13 +88,13 @@ def test_feedback_pull(tmp_path, monkeypatch, capsys):
         files = list((home / "feedback").glob("*.jsonl"))
         assert len(files) == 1
         assert [json.loads(line) for line in files[0].read_text().splitlines()] == ROWS
-        assert collector.reads[-1]["path"] == "/marks"
+        assert collector.requests[-1]["path"] == "/marks"
         assert TOKEN not in out
 
         # Case 4 · a second pull → it asks only for rows after the last one; "0 new marks"; no new file
         code, out = run(monkeypatch, capsys, "feedback", "pull")
         assert code == 0 and "0 new marks" in out, (code, out)
-        assert collector.reads[-1]["query"]["since"] == ["2026-11-15T11:30:00.000Z"]
+        assert collector.requests[-1]["query"]["since"] == ["2026-11-15T11:30:00.000Z"]
         assert len(list((home / "feedback").glob("*.jsonl"))) == 1
 
         # Case 5 · the whole run → no `claude` or `codex` command was called
@@ -135,34 +133,6 @@ def wait_for(check, seconds=1.0):
     return check()
 
 
-class SlowCollector:
-    """Answers each POST /marks after 2 seconds and keeps its body."""
-
-    def __init__(self):
-        self.posts = []
-        collector = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_POST(self):
-                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                time.sleep(2)
-                collector.posts.append(body)
-                self.send_response(200)
-                self.send_header("Content-Length", "2")
-                self.end_headers()
-                self.wfile.write(b"{}")
-
-            def log_message(self, *args):
-                pass
-
-        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
-        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
-
-    def stop(self):
-        self.httpd.shutdown()
-
-
 def mark(port, video, flag, verdict, reason=""):
     return request(port, f"/videos/{video}/marks", {"flag_id": flag["id"], "verdict": verdict, "reason": reason})
 
@@ -172,7 +142,7 @@ def test_mark_sends_itself(tmp_path, monkeypatch):
     home = tmp_path / "helper"
     monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
     home_with_flags(home)
-    collector, slow = FakeCollector(), SlowCollector()
+    collector, slow = FakeCollector(), FakeCollector(delay=2)
     (home / "config.toml").write_text(f'share_marks = true\nfeedback_url = "{collector.url}"\n')
     port, stop = start_helper(home)
     try:
@@ -253,10 +223,6 @@ def closed_port() -> int:
         return s.getsockname()[1]
 
 
-def mark_s27a2(port, flag, verdict, reason=""):
-    return request(port, f"/videos/{VIDEO}/marks", {"flag_id": flag["id"], "verdict": verdict, "reason": reason})
-
-
 def test_down_collector_waits(tmp_path, monkeypatch, capsys):
     cli_log = fail_clis(tmp_path, monkeypatch)
     home = tmp_path / "helper"
@@ -268,14 +234,14 @@ def test_down_collector_waits(tmp_path, monkeypatch, capsys):
     port, stop = start_helper(home)
     try:
         # Case 1 · the collector answers 503 → the mark is taken as always; nothing stored, no file
-        assert mark_s27a2(port, FALLACY, "correct", "sí") == (200, {"ok": True})
+        assert mark(port, VIDEO, FALLACY, "correct", "sí") == (200, {"ok": True})
         time.sleep(1)
         assert collector.posts == []
         assert list(home.glob(DATED)) == []
 
         # Case 2 · nothing listens on the collector's port → the same: taken, no file, the helper keeps answering
         (home / "config.toml").write_text(f'share_marks = true\nfeedback_url = "http://127.0.0.1:{closed_port()}"\n')
-        assert mark_s27a2(port, FIGURE, "unfair", "es 11 %") == (200, {"ok": True})
+        assert mark(port, VIDEO, FIGURE, "unfair", "es 11 %") == (200, {"ok": True})
         time.sleep(1)
         assert list(home.glob(DATED)) == []
         assert request(port, f"/videos/{VIDEO}")[0] == 200
@@ -290,7 +256,7 @@ def test_down_collector_waits(tmp_path, monkeypatch, capsys):
         # Case 4 · the collector is back, a third mark → one request holds all 3 marks; still no file
         collector.fail = None
         (home / "config.toml").write_text(f'share_marks = true\nfeedback_url = "{collector.url}"\n')
-        mark_s27a2(port, LATER, "unfair")
+        mark(port, VIDEO, LATER, "unfair")
         end = time.monotonic() + 1
         while not collector.posts and time.monotonic() < end:
             time.sleep(0.02)
@@ -321,10 +287,6 @@ def test_down_collector_waits(tmp_path, monkeypatch, capsys):
 # port. Failing fake `claude` and `codex` commands on PATH. The ⚙ box and the panel line are checked in
 # tests/extension/settings.test.ts (S27 A3).
 
-def mark_s27a3(port, flag, verdict):
-    return request(port, f"/videos/{VIDEO}/marks", {"flag_id": flag["id"], "verdict": verdict, "reason": ""})
-
-
 def test_sharing_off(tmp_path, monkeypatch):
     cli_log = fail_clis(tmp_path, monkeypatch)
     home = tmp_path / "helper"
@@ -335,8 +297,7 @@ def test_sharing_off(tmp_path, monkeypatch):
     config.write_text(f'# my settings\nfeedback_url = "{collector.url}"\n\n[models]\nparts = "sonnet"\n')
     port, stop = start_helper(home)
     try:
-        # Case 1 · no share_marks line → not asked yet (S30): null, and nothing is shared
-        assert request(port, "/share") == (200, {"share": None})
+        # Case 1 · no share_marks line → not asked yet: S30 A2 Case 2
 
         # Case 2 · the box unticked → share_marks = false in config.toml, the other lines kept, top level
         assert request(port, "/share", {"share": False}) == (200, {"share": False})
@@ -347,7 +308,7 @@ def test_sharing_off(tmp_path, monkeypatch):
         assert request(port, "/share") == (200, {"share": False})
 
         # Case 3 · a mark with sharing off → after a second the collector has nothing
-        assert mark_s27a3(port, FALLACY, "correct") == (200, {"ok": True})
+        assert mark(port, VIDEO, FALLACY, "correct") == (200, {"ok": True})
         time.sleep(1)
         assert collector.posts == []
 
@@ -355,7 +316,7 @@ def test_sharing_off(tmp_path, monkeypatch):
         assert request(port, "/share", {"share": True}) == (200, {"share": True})
         assert config.read_text().count("share_marks") == 1
         assert tomllib.loads(config.read_text())["share_marks"] is True
-        mark_s27a3(port, FIGURE, "unfair")
+        mark(port, VIDEO, FIGURE, "unfair")
         end = time.monotonic() + 1
         while not collector.posts and time.monotonic() < end:
             time.sleep(0.02)
@@ -365,7 +326,7 @@ def test_sharing_off(tmp_path, monkeypatch):
         # Case 5 · share_marks = false written by hand → a mark sends nothing
         config.write_text(f'share_marks = false\nfeedback_url = "{collector.url}"\n')
         assert request(port, "/share") == (200, {"share": False})
-        mark_s27a3(port, LATER, "unfair")
+        mark(port, VIDEO, LATER, "unfair")
         time.sleep(1)
         assert len(collector.posts) == 1
 
@@ -394,8 +355,9 @@ ALLOWED = {"video_id", "lang", "spoken", "status", "published_at", "title", "cha
            "claims", "questions", "readers", "cost_usd", "analysed_until", "helper_version", "flags"}
 
 
-def analyse(base: str, video: str, start: int) -> dict:
-    urllib.request.urlopen(urllib.request.Request(f"{base}/videos/{video}?from={start}&lang=es", method="POST"),
+def analyse(base: str, video: str, start: int = 0, lang: str = "es") -> dict:
+    """Starts the analysis of `video` from `start` as the extension does, and polls it until it is no longer running."""
+    urllib.request.urlopen(urllib.request.Request(f"{base}/videos/{video}?from={start}&lang={lang}", method="POST"),
                            timeout=10)
     for _ in range(300):
         try:
@@ -405,12 +367,12 @@ def analyse(base: str, video: str, start: int) -> dict:
         except urllib.error.HTTPError:
             pass
         time.sleep(0.1)
-    raise AssertionError(f"FAIL S28 A1 · the analysis of {video} did not finish in 30 s")
+    raise AssertionError(f"FAIL · the analysis of {video} did not finish in 30 s")
 
 
 def test_whole_analysis_uploads(tmp_path, monkeypatch):
     home, _ = setup(tmp_path, monkeypatch)
-    collector = FakeCollector_shared_analysis()
+    collector = FakeCollector()
     (home / "config.toml").write_text(f'share_marks = true\nfeedback_url = "{collector.url}"\n')
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(home)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -469,7 +431,7 @@ def test_whole_analysis_uploads(tmp_path, monkeypatch):
 
 def test_shared_flags_at_once(tmp_path, monkeypatch):
     cli_log = fail_clis(tmp_path, monkeypatch)
-    collector = FakeCollector_shared_analysis({(SHARED_VIDEO, "es"): ANALYSIS})
+    collector = FakeCollector(analyses={(SHARED_VIDEO, "es"): ANALYSIS})
     homes = {lang: tmp_path / f"home-{lang}" for lang in ("es", "en")}
     helpers = {}
     for lang, home in homes.items():
@@ -528,7 +490,7 @@ def test_shared_flags_at_once(tmp_path, monkeypatch):
 
 def test_sharing_off_uploads_nothing(tmp_path, monkeypatch):
     home, log = setup(tmp_path, monkeypatch)
-    collector = FakeCollector_shared_analysis({(SHARED_VIDEO, "es"): ANALYSIS})
+    collector = FakeCollector(analyses={(SHARED_VIDEO, "es"): ANALYSIS})
     (home / "config.toml").write_text(f'feedback_url = "{collector.url}"\n')
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(home)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -539,18 +501,8 @@ def test_sharing_off_uploads_nothing(tmp_path, monkeypatch):
         assert request(port, "/share", {"share": False}) == (200, {"share": False})
 
         # Case 2 · a whole analysis from 0:00 → done, and no upload
-        urllib.request.urlopen(urllib.request.Request(f"{base}/videos/esview?from=0&lang=es", method="POST"),
-                               timeout=10)
-        data = None
-        for _ in range(300):
-            try:
-                data = json.loads(urllib.request.urlopen(f"{base}/videos/esview?at=0", timeout=10).read())
-                if data["status"] != "running":
-                    break
-            except urllib.error.HTTPError:
-                pass
-            time.sleep(0.1)
-        assert data and data["status"] == "done", f"FAIL S28 A4 · the analysis did not end done: {data}"
+        data = analyse(base, "esview")
+        assert data["status"] == "done", f"FAIL S28 A4 · the analysis did not end done: {data}"
         time.sleep(1.5)
         assert collector.puts() == [], "FAIL S28 A4 · an analysis was uploaded with sharing off"
 
@@ -580,7 +532,6 @@ def test_sharing_off_uploads_nothing(tmp_path, monkeypatch):
 # Failing fake `claude` and `codex` commands on PATH. What the collector stores and serves is checked in
 # tests/collector/analyses.test.ts (S30 A1).
 
-TOKEN_s30a1 = "invented-admin-token"
 STRANGER = "11111111-1111-4111-8111-111111111111"
 PENDING = [
     {"video_id": "abcdefgh", "lang": "es", "model": "opus", "flags": 2, "install_id": STRANGER,
@@ -590,68 +541,13 @@ PENDING = [
 ]
 
 
-class ReviewCollector:
-    def __init__(self):
-        self.pending, self.requests = [dict(r) for r in PENDING], []
-        collector = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def _reply(self, code, body):
-                raw = json.dumps(body).encode()
-                self.send_response(code)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(raw)))
-                self.end_headers()
-                self.wfile.write(raw)
-
-            def _record(self):
-                url = urlparse(self.path)
-                length = int(self.headers.get("Content-Length") or 0)
-                collector.requests.append({"method": self.command, "path": url.path, "query": parse_qs(url.query),
-                                           "auth": self.headers.get("Authorization"),
-                                           "body": json.loads(self.rfile.read(length)) if length else None})
-                return url
-
-            def do_GET(self):
-                self._record()
-                if self.headers.get("Authorization") != f"Bearer {TOKEN_s30a1}":
-                    return self._reply(401, {"error": "unauthorized"})
-                self._reply(200, {"rows": collector.pending})
-
-            def do_POST(self):
-                url = self._record()
-                if self.headers.get("Authorization") != f"Bearer {TOKEN_s30a1}":
-                    return self._reply(401, {"error": "unauthorized"})
-                _, _, video, action = url.path.split("/")
-                lang = parse_qs(url.query).get("lang", [""])[0]
-                found = [r for r in collector.pending if (r["video_id"], r["lang"]) == (video, lang)]
-                if not found:
-                    return self._reply(404, {"error": "nothing pending"})
-                collector.pending = [r for r in collector.pending if r not in found]
-                self._reply(200, {"approved" if action == "approve" else "rejected": True})
-
-            def do_PUT(self):
-                self._record()
-                self._reply(202, {"pending": True})
-
-            def log_message(self, *args):
-                pass
-
-        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
-        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
-
-    def stop(self):
-        self.httpd.shutdown()
-
-
 def test_shared_review(tmp_path, monkeypatch, capsys):
     cli_log = fail_clis(tmp_path, monkeypatch)
     home = tmp_path / "helper"
     home.mkdir()
     monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
     monkeypatch.delenv("FEEDBACK_ADMIN_TOKEN", raising=False)
-    collector = ReviewCollector()
+    collector = FakeCollector(pending=PENDING)
     (home / "config.toml").write_text(f'feedback_url = "{collector.url}"\n')
     try:
         # Case 1 · no admin token → the list names FEEDBACK_ADMIN_TOKEN and exits 1
@@ -659,21 +555,21 @@ def test_shared_review(tmp_path, monkeypatch, capsys):
         assert code == 1 and "FEEDBACK_ADMIN_TOKEN" in out, f"FAIL S30 A1 · no token: {code} {out!r}"
 
         # Case 2 · the token in .env → one line per pending upload: video, lang, model, flags, install id, date
-        (home / ".env").write_text(f"FEEDBACK_ADMIN_TOKEN={TOKEN_s30a1}\n")
+        (home / ".env").write_text(f"FEEDBACK_ADMIN_TOKEN={TOKEN}\n")
         code, out = run(monkeypatch, capsys, "shared", "list")
         assert code == 0, f"FAIL S30 A1 · list exited {code}: {out!r}"
         line = next((x for x in out.splitlines() if "abcdefgh" in x), "")
         for part in ("abcdefgh", " es ", "opus", "2 flags", STRANGER, "2026-11-15"):
             assert part in f" {line} ", f"FAIL S30 A1 · the list line misses {part!r}: {line!r}"
-        assert "otherone" in out and TOKEN_s30a1 not in out
-        assert collector.requests[-1]["path"] == "/analyses" and collector.requests[-1]["auth"] == f"Bearer {TOKEN_s30a1}"
+        assert "otherone" in out and TOKEN not in out
+        assert collector.requests[-1]["path"] == "/analyses" and collector.requests[-1]["auth"] == f"Bearer {TOKEN}"
 
         # Case 3 · approve abcdefgh es → POST /analyses/abcdefgh/approve?lang=es with the token; exit 0
         code, out = run(monkeypatch, capsys, "shared", "approve", "abcdefgh", "es")
         last = collector.requests[-1]
         assert code == 0, f"FAIL S30 A1 · approve exited {code}: {out!r}"
         assert (last["method"], last["path"], last["query"], last["auth"]) == \
-            ("POST", "/analyses/abcdefgh/approve", {"lang": ["es"]}, f"Bearer {TOKEN_s30a1}")
+            ("POST", "/analyses/abcdefgh/approve", {"lang": ["es"]}, f"Bearer {TOKEN}")
 
         # Case 4 · reject otherone es → POST /analyses/otherone/reject?lang=es; the list is then empty
         code, out = run(monkeypatch, capsys, "shared", "reject", "otherone", "es")
@@ -689,7 +585,7 @@ def test_shared_review(tmp_path, monkeypatch, capsys):
 
         # Case 6 · the owner's helper uploads → the PUT carries the admin token; a tester's helper sends none
         analyses.upload(home, collector.url, ANALYSIS)
-        assert collector.requests[-1]["method"] == "PUT" and collector.requests[-1]["auth"] == f"Bearer {TOKEN_s30a1}", \
+        assert collector.requests[-1]["method"] == "PUT" and collector.requests[-1]["auth"] == f"Bearer {TOKEN}", \
             "FAIL S30 A1 · the owner's upload has no admin token"
         (home / ".env").write_text("")
         analyses.upload(home, collector.url, ANALYSIS)
@@ -719,28 +615,10 @@ def test_shared_review(tmp_path, monkeypatch, capsys):
 EXAMPLE = Path(server.__file__).parent / "config.example.toml"
 
 
-def analyse_s30a2(base: str, video: str, lang: str) -> dict:
-    urllib.request.urlopen(urllib.request.Request(f"{base}/videos/{video}?from=0&lang={lang}", method="POST"),
-                           timeout=10)
-    for _ in range(300):
-        try:
-            data = json.loads(urllib.request.urlopen(f"{base}/videos/{video}?at=0", timeout=10).read())
-            if data["status"] != "running":
-                return data
-        except urllib.error.HTTPError:
-            pass
-        time.sleep(0.1)
-    raise AssertionError(f"FAIL S30 A2 · the analysis of {video} did not finish in 30 s")
-
-
-def mark_s30a2(port: int, video: str, flag_id: str) -> tuple:
-    return request(port, f"/videos/{video}/marks", {"flag_id": flag_id, "verdict": "correct", "reason": ""})
-
-
 def test_consent_first(tmp_path, monkeypatch):
     home, _ = setup(tmp_path, monkeypatch)
     monkeypatch.delenv("FEEDBACK_ADMIN_TOKEN", raising=False)
-    collector = FakeCollector_shared_analysis()
+    collector = FakeCollector()
     (home / "config.toml").write_text(f'feedback_url = "{collector.url}"\n')
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(home)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -756,33 +634,33 @@ def test_consent_first(tmp_path, monkeypatch):
         assert request(port, "/share") == (200, {"share": None}), f"FAIL S30 A2 · {request(port, '/share')}"
 
         # Case 3 · never answered, a whole analysis → done, and no upload
-        data = analyse_s30a2(base, "esview", "es")
+        data = analyse(base, "esview")
         assert data["status"] == "done" and data["flags"], f"FAIL S30 A2 · {data['status']}"
         time.sleep(1.5)
         assert collector.puts() == [], "FAIL S30 A2 · an analysis was uploaded before the answer"
 
         # Case 4 · never answered, a mark → kept, and nothing sent
-        assert mark_s30a2(port, "esview", data["flags"][0]["id"]) == (200, {"ok": True})
+        assert mark(port, "esview", data["flags"][0], "correct") == (200, {"ok": True})
         time.sleep(1)
         assert posts() == [], "FAIL S30 A2 · a mark was sent before the answer"
 
         # Case 5 · "Sí, compartir" → share_marks = true; the next mark goes, and the next whole analysis uploads
         assert request(port, "/share", {"share": True}) == (200, {"share": True})
         assert tomllib.loads((home / "config.toml").read_text())["share_marks"] is True
-        assert mark_s30a2(port, "esview", data["flags"][-1]["id"]) == (200, {"ok": True})
+        assert mark(port, "esview", data["flags"][-1], "correct") == (200, {"ok": True})
         end = time.monotonic() + 2
         while not posts() and time.monotonic() < end:
             time.sleep(0.05)
         assert [m["flag_id"] for p in posts() for m in p["body"]["marks"]] == [data["flags"][-1]["id"]], \
             "FAIL S30 A2 · after yes, the new mark was not sent alone"
-        assert analyse_s30a2(base, "enview", "en")["status"] == "done"
+        assert analyse(base, "enview", lang="en")["status"] == "done"
         assert len(collector.wait_puts(1)) == 1, "FAIL S30 A2 · after yes, the whole analysis was not uploaded"
 
         # Case 6 · "No" → share_marks = false; GET /share says false; a mark sends nothing
         assert request(port, "/share", {"share": False}) == (200, {"share": False})
         assert request(port, "/share") == (200, {"share": False})
         sent = len(posts())
-        assert mark_s30a2(port, "enview", analyse_s30a2(base, "enview", "en")["flags"][0]["id"]) == (200, {"ok": True})
+        assert mark(port, "enview", analyse(base, "enview", lang="en")["flags"][0], "correct") == (200, {"ok": True})
         time.sleep(1)
         assert len(posts()) == sent, "FAIL S30 A2 · a mark was sent after no"
         assert len(collector.puts()) == 1, "FAIL S30 A2 · an analysis was uploaded after no"

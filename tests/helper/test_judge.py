@@ -2,14 +2,14 @@
 import json
 import re
 import sys
-from pathlib import Path
 
 from fact_checker import cli, server
 from fact_checker.core import scheduler
 from fact_checker.core.flags import Segment, Transcript
 from fact_checker.server import judged, run_analysis
 from judge_fakes import DISPUTED_ID, FakeJudge, FALLACY_ID, FALSE_ID, FLAGS, REPROACH_ID, SELF_ID, transcript
-from screen_fakes import fake_clis, fake_video, jsonl
+from interview_fakes import fake_clis, jsonl, THREE_PARTS
+from video_fakes import FakeTranscript, fake_video, GUEST, HOST, NoPublishedChecks, spoken
 
 
 # S15 A1 · The judge rules on every flag once the analysis ends
@@ -31,7 +31,6 @@ from screen_fakes import fake_clis, fake_video, jsonl
 # its tools and the file status at that moment. A second fake judge raises an error; a third run has a sparse
 # 2.5-hour interview. A temporary helper home.
 
-HOST, GUEST = "SPEAKER_00", "SPEAKER_01"
 FALLACY = "ustedes no tienen ninguna autoridad moral para hablar de nada"
 FALSE = "España recibió cuarenta y nueve coma ocho millones de turistas"
 DISPUTED = "el paro juvenil es el más alto de toda Europa"
@@ -58,21 +57,6 @@ def ids(lines):
 
 
 IDS = ids(LINES)
-
-
-class FakeTranscript:
-    def __init__(self, lines=LINES):
-        self.lines = lines
-
-    def fetch(self, video_id):
-        segments = [Segment(t=t + i * 0.5, text=w, speaker=voice)
-                    for t, voice, text in self.lines for i, w in enumerate(text.split())]
-        return Transcript(segments=segments, published_at="2026-11-10", speakers={HOST: "Luis", GUEST: "Ana Ruiz"})
-
-
-class NoPublishedChecks:
-    def search(self, query, language):
-        return []
 
 
 def measure(supports, tier=1):
@@ -120,7 +104,8 @@ class FakeClaude:
 
 def analyse(home, judge_fails=False, lines=LINES):
     claude = FakeClaude(home, "entrevista", ids(lines), judge_fails)
-    run_analysis("entrevista", 0, transcript=FakeTranscript(lines), llm=claude, judge=claude,
+    captions = FakeTranscript(spoken(lines), speakers={HOST: "Luis", GUEST: "Ana Ruiz"})
+    run_analysis("entrevista", 0, transcript=captions, llm=claude, judge=claude,
                  factcheck=NoPublishedChecks(), home=home)
     return json.loads((home / "videos" / "entrevista.json").read_text()), claude.judge_calls
 
@@ -161,10 +146,7 @@ def test_judge_verdicts(tmp_path):
     assert false["judge"]["reason"] == NITPICK
     assert (false["label"], false["speaker"], false["reason"]) == ("false", "Ana Ruiz", "Las fuentes dan otra cifra.")
 
-    # Case 5 · the judge answers "drop" for the disputed figure → kept (S32: the judge drops no flag)
-    disputed = flags[IDS["disputed"]]
-    assert disputed["judge"]["verdict"] == "keep"
-    assert disputed["label"] == "disputed"
+    # Case 5 · the judge answers "drop" for the disputed figure → kept: S32 A1 Case 2
 
     # Case 6 · the context card → no verdict
     assert "judge" not in context[0]
@@ -280,14 +262,6 @@ def test_nitpick_any_type():
 VIDEO = "entrevista-inventada"
 
 
-class FakeYouTube:
-    def __init__(self, workdir, speech=None):
-        pass
-
-    def fetch(self, video_id):
-        return transcript()
-
-
 def test_marks_speaker_fix(tmp_path, monkeypatch, capsys):
     (tmp_path / "videos").mkdir()
     tr = transcript()
@@ -299,7 +273,7 @@ def test_marks_speaker_fix(tmp_path, monkeypatch, capsys):
     llm = FakeJudge({REPROACH_ID: ("keep", "Lo dice la presentadora.", "Presentadora"),
                      FALLACY_ID: ("keep", "El ataque es suyo.", None),
                      FALSE_ID: ("keep", "La cifra es otra.", None)})
-    monkeypatch.setattr(cli, "YouTube", FakeYouTube)
+    monkeypatch.setattr(cli, "YouTube", lambda *args, **kwargs: FakeTranscript(tr.segments, speakers=tr.speakers))
     monkeypatch.setattr(server, "speech_cli", lambda: None)
     monkeypatch.setattr(server, "provider_llm", lambda home, name, **options: llm)
 
@@ -326,49 +300,37 @@ def test_marks_speaker_fix(tmp_path, monkeypatch, capsys):
 # Setup: an invented 3-minute interview of one guest ("Ana Ruiz") with five flags as the parts found them: a false
 # figure, a weak generalisation, a near date, and two more false figures for the edge case. A fake judge LLM that answers
 # with the rulings it is given (it also sends a severity on the puntualización, as a careless provider can) and records
-# each prompt and schema. The helper's judge step, the one that runs before the flag file says done.
+# each prompt and schema (judge_fakes). The helper's judge step, the one that runs before the flag file says done.
 
-GUEST_s34a1 = "SPEAKER_00"
-LINES_s34a1 = [(0, "el paro bajó a la mitad en un solo año"), (40, "todos los jóvenes se van del país"),
+ANA = "SPEAKER_00"
+SEVERITY_LINES = [(0, "el paro bajó a la mitad en un solo año"), (40, "todos los jóvenes se van del país"),
          (80, "la ley se aprobó en marzo de 2019"), (120, "la deuda pública es del doscientos por ciento"),
          (160, "los precios subieron un cuarenta por ciento")]
 
 
-def transcript_s34a1() -> Transcript:
-    return Transcript(segments=[Segment(t=t, text=text, speaker=GUEST_s34a1) for t, text in LINES_s34a1],
-                      published_at="2026-11-10", speakers={GUEST_s34a1: "Ana Ruiz"})
+def severity_transcript() -> Transcript:
+    return Transcript(segments=[Segment(t=t, text=text, speaker=ANA) for t, text in SEVERITY_LINES],
+                      published_at="2026-11-10", speakers={ANA: "Ana Ruiz"})
 
 
 def flag(t, label, type="inaccuracy"):
-    return {"id": f"{label}-{t:.1f}", "t": float(t), "speaker": "Ana Ruiz", "quote": dict(LINES_s34a1)[t], "type": type,
+    return {"id": f"{label}-{t:.1f}", "t": float(t), "speaker": "Ana Ruiz", "quote": dict(SEVERITY_LINES)[t], "type": type,
             "label": label, "reason": f"Motivo inventado del segundo {t}.", "confidence": 0.9}
 
 
-FLAGS_s34a1 = [flag(0, "false"), flag(40, "hasty_generalization", "fallacy"), flag(80, "false"), flag(120, "false"),
+SEVERITY_FLAGS = [flag(0, "false"), flag(40, "hasty_generalization", "fallacy"), flag(80, "false"), flag(120, "false"),
          flag(160, "false")]
-FALSE_ID_s34a1, WEAK_ID, DATE_ID, NONE_ID, ODD_ID = (f["id"] for f in FLAGS_s34a1)
-RULINGS = {FALSE_ID_s34a1: ("keep", "Bajó del 12 % al 11 %, no a la mitad.", "serious"),
-           WEAK_ID: ("keep", "Generaliza desde unos pocos casos.", "minor"),
-           DATE_ID: ("nitpick", "Se aprobó en abril de 2019", "moderate"),
-           NONE_ID: ("keep", "Es del 110 %.", None),
-           ODD_ID: ("keep", "Subieron un 14 %.", "huge")}
-
-
-class FakeJudge_s34a1:
-    """Answers each judge reading with RULINGS: flag id → (verdict, reason, severity)."""
-
-    def __init__(self):
-        self.calls = []
-
-    def complete(self, prompt, schema, tools=()):
-        self.calls.append({"prompt": str(prompt), "schema": schema})
-        return {"rulings": [{"id": i, "verdict": v, "reason": r, "speaker": None, "severity": s}
-                            for i, (v, r, s) in RULINGS.items()]}
+BIG_FALSE_ID, WEAK_ID, DATE_ID, NONE_ID, ODD_ID = (f["id"] for f in SEVERITY_FLAGS)
+RULINGS = {BIG_FALSE_ID: ("keep", "Bajó del 12 % al 11 %, no a la mitad.", None, "serious"),
+           WEAK_ID: ("keep", "Generaliza desde unos pocos casos.", None, "minor"),
+           DATE_ID: ("nitpick", "Se aprobó en abril de 2019", None, "moderate"),
+           NONE_ID: ("keep", "Es del 110 %.", None, None),
+           ODD_ID: ("keep", "Subieron un 14 %.", None, "huge")}
 
 
 def test_severity_on_keep():
-    llm = FakeJudge_s34a1()
-    flags = {f["id"]: f for f in judged(FLAGS_s34a1, transcript_s34a1(), llm)}
+    llm = FakeJudge(RULINGS)
+    flags = {f["id"]: f for f in judged(SEVERITY_FLAGS, severity_transcript(), llm)}
     assert len(llm.calls) == 1
 
     # Case 1 · the judge's reading → offered the three levels and told the rubric: by the point, never by intent
@@ -381,7 +343,7 @@ def test_severity_on_keep():
         assert word in prompt, f"the prompt does not name {word!r}"
 
     # Case 2 · the false figure kept as serious → `serious` in its verdict
-    assert flags[FALSE_ID_s34a1]["judge"] == {"verdict": "keep", "reason": RULINGS[FALSE_ID_s34a1][1], "severity": "serious"}
+    assert flags[BIG_FALSE_ID]["judge"] == {"verdict": "keep", "reason": RULINGS[BIG_FALSE_ID][1], "severity": "serious"}
 
     # Case 3 · the weak generalisation kept as minor → `minor` in its verdict
     assert flags[WEAK_ID]["judge"]["verdict"] == "keep"
@@ -407,7 +369,7 @@ VIDEO_judge_own_budget = "presupuesto1"
 
 
 def run(tmp_path, monkeypatch) -> tuple[list[dict], dict]:
-    fake_video(monkeypatch)
+    fake_video(monkeypatch, THREE_PARTS)
     home = tmp_path / "home"
     monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
     claude_log, _ = fake_clis(tmp_path / "run", monkeypatch)

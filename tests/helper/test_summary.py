@@ -35,15 +35,15 @@ from compare_fakes import (
     NURIA,
     save,
     UNFAIR_QUOTE,
-    visible as visible_compare,
 )
 from fact_checker import analyses, server
 from fact_checker.core import summary
 from fact_checker.core.summary import alt_text, card
 from fact_checker.server import run_analysis
 from fact_checker.store import Store
-from roles_fakes import FakeModel, FakeTranscript, FakeVoices, GUEST as GUEST_roles, HOST
-from shared_analysis_fakes import FakeCollector
+from fake_servers import FakeCollector
+from roles_fakes import GUEST as GUEST_roles, HOST, NamingModel, TITLED, TURNS
+from video_fakes import FakeVoices
 
 
 # S15 A3 · The shareable card takes the speaker from the judge
@@ -56,11 +56,10 @@ from shared_analysis_fakes import FakeCollector
 # field), with two speakers and no `people`, so each speaker gets a card; passed to fact_checker.core.summary.card and
 # alt_text (S35).
 
-HOST_s15a3 = "Luis (presentador)"
-GUEST_s15a3 = "Ana Ruiz (invitada)"
+LUIS = "Luis (presentador)"
 
 
-def flag_s15a3(id, t, speaker, type, label, judge=None, mark=None):
+def judged_flag(id, t, speaker, type, label, judge=None, mark=None):
     f = {"id": id, "t": t, "speaker": speaker, "quote": f"frase inventada {id}", "type": type, "label": label,
          "reason": "Motivo inventado.", "confidence": 0.9, "related": None, "sources": [], "note": None,
          "on_player": True}
@@ -71,18 +70,18 @@ def flag_s15a3(id, t, speaker, type, label, judge=None, mark=None):
 
 DATA = {"video_id": "abcdefgh", "published_at": "2026-11-10", "status": "done", "stop_reason": None,
         "title": "Entrevista inventada", "channel": "Canal de prueba", "duration": 600.0,
-        "speakers": {"SPEAKER_00": HOST_s15a3, "SPEAKER_01": GUEST_s15a3},
+        "speakers": {"SPEAKER_00": LUIS, "SPEAKER_01": GUEST},
         "flags": [
-            flag_s15a3("ad_hominem-60.0", 60, HOST_s15a3, "fallacy", "ad_hominem",
-                 {"verdict": "keep", "reason": "Lo dice el invitado.", "speaker": GUEST_s15a3}, "correct"),
-            flag_s15a3("false-120.0", 120, GUEST_s15a3, "inaccuracy", "false", {"verdict": "drop", "reason": "Error menor."}),
-            flag_s15a3("false-180.0", 180, GUEST_s15a3, "inaccuracy", "false", {"verdict": "drop", "reason": "Error menor."},
+            judged_flag("ad_hominem-60.0", 60, LUIS, "fallacy", "ad_hominem",
+                 {"verdict": "keep", "reason": "Lo dice el invitado.", "speaker": GUEST}, "correct"),
+            judged_flag("false-120.0", 120, GUEST, "inaccuracy", "false", {"verdict": "drop", "reason": "Error menor."}),
+            judged_flag("false-180.0", 180, GUEST, "inaccuracy", "false", {"verdict": "drop", "reason": "Error menor."},
                  "correct"),
         ]}
 
 
 def test_summary_speaker():
-    guest, host = card(DATA, GUEST_s15a3), card(DATA, HOST_s15a3)
+    guest, host = card(DATA, GUEST), card(DATA, LUIS)
 
     # Case 1 · a flag marked correct that the judge gave from Luis to Ana Ruiz → on Ana Ruiz's card, not Luis's
     assert guest["devices"] == [("Ad hominem", 1)], f"FAIL S15 A3 · Ana Ruiz's devices {guest['devices']}"
@@ -160,72 +159,6 @@ def test_summary_language(tmp_path):
     print("PASS S26 A4 · The shareable card follows the interface language")
 
 
-# S33 A2 · The summary image leaves out the host
-#
-# Story: In the invented interview, the person marks correct one flag of the host and two of Ana Ruiz, then exports the
-# summary. The export page has one card, Ana Ruiz's (S35); the card and its alt text show her two flags, and nothing of
-# the host.
-#
-# Setup: a temporary helper home with the flag file of an invented interview: the voices "Presentador" (people: host) and
-# "Ana Ruiz (invitada)" (people: guest, person "Ana Ruiz"), one fallacy of the host and a false figure and a fallacy of
-# Ana Ruiz, all three marked correct through the store. The export page comes from the helper's own HTTP server on a
-# free local port; the alt text comes from `summary.card` and `summary.alt_text`, and the card page from the helper's
-# `summary_page`, as the PNG route builds it, with no thumbnail, both from the flag file with the same marks.
-
-HOST_s33a2, GUEST_s33a2 = "Presentador", "Ana Ruiz (invitada)"
-HOST_QUOTE_s33a2 = "la oposición no tiene autoridad para hablar de nada"
-GUEST_FALSE = "el paro bajó a la mitad en un solo año"
-GUEST_FALLACY = "mis rivales no saben gestionar ni su comunidad de vecinos"
-
-
-def flag_s33a2(id, t, speaker, quote, type, label):
-    return {"id": id, "t": t, "speaker": speaker, "quote": quote, "type": type, "label": label,
-            "reason": "Motivo inventado.", "confidence": 0.9, "related": None, "sources": [], "note": None,
-            "on_player": True}
-
-
-FLAGS = [flag_s33a2("fallacy-30.0", 30.0, HOST_s33a2, HOST_QUOTE_s33a2, "fallacy", "ad_hominem"),
-         flag_s33a2("false-600.0", 600.0, GUEST_s33a2, GUEST_FALSE, "inaccuracy", "false"),
-         flag_s33a2("fallacy-900.0", 900.0, GUEST_s33a2, GUEST_FALLACY, "fallacy", "ad_hominem")]
-FILE_s33a2 = {"video_id": "entrevista", "published_at": "2026-11-10", "status": "done", "stop_reason": None, "lang": "es",
-        "title": "Entrevista inventada a Ana Ruiz", "channel": "Canal inventado", "duration": 3720.0,
-        "speakers": {"SPEAKER_00": HOST_s33a2, "SPEAKER_01": GUEST_s33a2},
-        "people": {HOST_s33a2: {"role": "host", "person": HOST_s33a2, "spoken_s": 1260, "set_by": "llm"},
-                   GUEST_s33a2: {"role": "guest", "person": "Ana Ruiz", "spoken_s": 2460, "set_by": "llm"}},
-        "flags": FLAGS}
-
-
-def test_guests_only(tmp_path, monkeypatch):
-    monkeypatch.setattr(server, "thumbnail", lambda video_id, home: None)
-    store = Store(tmp_path)
-    store.save(FILE_s33a2)
-    for f in FLAGS:
-        store.add_mark("entrevista", f, "correct", "")
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(tmp_path)))
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    try:
-        page = urllib.request.urlopen(f"http://127.0.0.1:{httpd.server_port}/videos/entrevista/summary",
-                                      timeout=10).read().decode()
-    finally:
-        httpd.shutdown()
-    marked = FILE_s33a2 | {"flags": [f | {"mark": "correct"} for f in FLAGS]}
-    alt = summary.alt_text(summary.card(marked, GUEST_s33a2))
-    image = re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", "", server.summary_page(marked, GUEST_s33a2), flags=re.S))
-
-    # Case 1 · the export page → one card, Ana Ruiz's, and none for the host
-    assert page.count("summary.png?person=") == 1 and "person=Ana+Ruiz" in page, f"FAIL S33 A2 · cards {page!r}"
-    assert summary.guests(marked) == [GUEST_s33a2], f"FAIL S33 A2 · cards for {summary.guests(marked)}"
-
-    # Case 2 · the alt text → Ana Ruiz and her two flags, nothing of the host
-    assert "Ana Ruiz" in alt and "el paro bajó" in alt and "Ad hominem ×1" in alt, f"FAIL S33 A2 · alt text {alt!r}"
-    assert HOST_s33a2 not in alt and "la oposición" not in alt, f"FAIL S33 A2 · the alt text shows the host: {alt!r}"
-
-    # Case 3 · the image → Ana Ruiz and her two flags, nothing of the host
-    assert "Ana Ruiz" in image and "el paro bajó" in image and "Ad hominem" in image, "FAIL S33 A2 · Ana Ruiz's card"
-    assert HOST_s33a2 not in image and "la oposición" not in image, "FAIL S33 A2 · the image shows the host"
-    print("PASS S33 A2 · The summary image leaves out the host")
-
-
 # S33 A3 · A role the person sets holds, and the image follows
 #
 # Story: The reading took a guest for the host. The person sets that speaker to guest from the side panel and exports the
@@ -239,21 +172,21 @@ def test_guests_only(tmp_path, monkeypatch):
 
 ANA = "Ana Ruiz (invitada)"
 QUOTE = "el paro bajó a la mitad en un solo año"
-FLAG_s33a3 = {"id": "false-1300.0", "t": 1300.0, "speaker": ANA, "quote": QUOTE, "type": "inaccuracy", "label": "false",
+ANA_FALSE = {"id": "false-1300.0", "t": 1300.0, "speaker": ANA, "quote": QUOTE, "type": "inaccuracy", "label": "false",
         "reason": "Motivo inventado.", "confidence": 0.9, "related": None, "sources": [], "note": None,
         "on_player": True}
-FILE_s33a3 = {"video_id": "entrevista", "published_at": "2026-11-10", "status": "done", "stop_reason": None, "lang": "es",
+BOTH_HOSTS = {"video_id": "entrevista", "published_at": "2026-11-10", "status": "done", "stop_reason": None, "lang": "es",
         "title": "Entrevista inventada a Ana Ruiz", "channel": "Canal inventado", "duration": 3750.0,
         "speakers": {HOST: "Presentador", GUEST_roles: ANA},
         "people": {"Presentador": {"role": "host", "person": "Presentador", "spoken_s": 1260, "set_by": "llm"},
                    ANA: {"role": "host", "person": "Ana Ruiz", "spoken_s": 2460, "set_by": "llm"}},
-        "flags": [FLAG_s33a3]}
+        "flags": [ANA_FALSE]}
 
 
 def test_role_set_by_person(tmp_path):
     store = Store(tmp_path)
-    store.save(FILE_s33a3)
-    store.add_mark("entrevista", FLAG_s33a3, "correct", "")
+    store.save(BOTH_HOSTS)
+    store.add_mark("entrevista", ANA_FALSE, "correct", "")
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.handler(server.Helper(tmp_path)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{httpd.server_port}/videos/entrevista"
@@ -291,8 +224,8 @@ def test_role_set_by_person(tmp_path):
 
     # Case 4 · a later naming reads Ana Ruiz as host again → the role the person set stays
     named = {HOST: ("Presentador", "host", "Presentador"), GUEST_roles: (ANA, "host", "Ana Ruiz")}
-    run_analysis("entrevista", 0, transcript=FakeTranscript(), llm=FakeModel(named), home=tmp_path,
-                 voices=FakeVoices())
+    run_analysis("entrevista", 0, transcript=TITLED, llm=NamingModel(named), home=tmp_path,
+                 voices=FakeVoices(TURNS))
     people = store.load("entrevista")["people"]
     assert people[ANA]["role"] == "guest" and people[ANA]["set_by"] == "person", \
         f"FAIL S33 A3 · the later naming overwrote the person's role: {people[ANA]}"
@@ -397,6 +330,7 @@ def test_long_alt_text(tmp_path, monkeypatch):
 
 
 # S35 A2 · "Exportar resumen" gives one card per guest
+# S33 A2 · The summary image leaves out the host: no card and no alt text of the host here; the image: S35 A1 Case 6
 #
 # Story: The person clicks "Exportar resumen" on a debate with a host and two guests. The page that opens shows two
 # cards, one per guest and none for the host, each with its own alt text to copy. The person types "1/3 · Candidatos a
@@ -408,22 +342,22 @@ def test_long_alt_text(tmp_path, monkeypatch):
 # opens GET /videos/<id>/summary (tests/extension/panel.test.ts (S14 A3)); the series field is a form field named `series` that
 # reloads that page with `?series=`.
 
-VIDEO_s35a2 = "debate35"
-HOST_s35a2, ANA_s35a2, XOAN = "Moderadora", "Ana Ruiz (invitada)", "Xoán Pereira (invitado)"
-PERSON = {ANA_s35a2: "Ana Ruiz", XOAN: "Xoán Pereira"}
+DEBATE_VIDEO = "debate35"
+MODERATOR, XOAN = "Moderadora", "Xoán Pereira (invitado)"
+PERSON = {GUEST: "Ana Ruiz", XOAN: "Xoán Pereira"}
 SERIES = "1/3 · Candidatos a la Xunta"
-FLAGS_s35a2 = [flag(60.0, HOST_s35a2, "fallacy", "ad_hominem", "ustedes nunca responden a nada", severity="minor"),
-         flag(300.0, ANA_s35a2, "inaccuracy", "false", "el paro bajó a la mitad en un año", severity="serious",
+DEBATE_FLAGS = [flag(60.0, MODERATOR, "fallacy", "ad_hominem", "ustedes nunca responden a nada", severity="minor"),
+         flag(300.0, GUEST, "inaccuracy", "false", "el paro bajó a la mitad en un año", severity="serious",
               source="INE", reason="Bajó un 8 %."),
          flag(900.0, XOAN, "inaccuracy", "misleading", "somos los que más invierten en sanidad", severity="moderate",
               source="Ministerio de Sanidad", reason="Por habitante es la novena.")]
-DEBATE = {"video_id": VIDEO_s35a2, "published_at": "2026-11-12", "status": "done", "stop_reason": None, "lang": "es",
+DEBATE = {"video_id": DEBATE_VIDEO, "published_at": "2026-11-12", "status": "done", "stop_reason": None, "lang": "es",
           "spoken": "es", "title": "Debate inventado", "channel": "Canal inventado", "duration": 5400.0,
-          "speakers": {"SPEAKER_00": HOST_s35a2, "SPEAKER_01": ANA_s35a2, "SPEAKER_02": XOAN},
-          "people": {HOST_s35a2: {"role": "host", "person": HOST_s35a2, "spoken_s": 900, "set_by": "llm"},
-                     ANA_s35a2: {"role": "guest", "person": "Ana Ruiz", "spoken_s": 2000, "set_by": "llm"},
+          "speakers": {"SPEAKER_00": MODERATOR, "SPEAKER_01": GUEST, "SPEAKER_02": XOAN},
+          "people": {MODERATOR: {"role": "host", "person": MODERATOR, "spoken_s": 900, "set_by": "llm"},
+                     GUEST: {"role": "guest", "person": "Ana Ruiz", "spoken_s": 2000, "set_by": "llm"},
                      XOAN: {"role": "guest", "person": "Xoán Pereira", "spoken_s": 2100, "set_by": "person"}},
-          "claims": {ANA_s35a2: 12, XOAN: 15}, "questions": {ANA_s35a2: 6, XOAN: 7}, "flags": FLAGS_s35a2}
+          "claims": {GUEST: 12, XOAN: 15}, "questions": {GUEST: 6, XOAN: 7}, "flags": DEBATE_FLAGS}
 
 
 def cards(page: str) -> list[tuple[str, str]]:
@@ -433,25 +367,25 @@ def cards(page: str) -> list[tuple[str, str]]:
 
 
 def test_card_per_guest(tmp_path, monkeypatch):
-    save_with_marks(tmp_path, DEBATE, {f["id"]: "correct" for f in FLAGS_s35a2})
+    save_with_marks(tmp_path, DEBATE, {f["id"]: "correct" for f in DEBATE_FLAGS})
     base, stop = start(tmp_path, monkeypatch)
     try:
-        page = get(f"{base}/videos/{VIDEO_s35a2}/summary")
-        with_series = get(f"{base}/videos/{VIDEO_s35a2}/summary?series={quote(SERIES)}")
+        page = get(f"{base}/videos/{DEBATE_VIDEO}/summary")
+        with_series = get(f"{base}/videos/{DEBATE_VIDEO}/summary?series={quote(SERIES)}")
         shown = cards(page)
         named = cards(with_series)
-        images = {src: visible(get(f"{base}/videos/{VIDEO_s35a2}/{src}")) for src, _ in named}
+        images = {src: visible(get(f"{base}/videos/{DEBATE_VIDEO}/{src}")) for src, _ in named}
     finally:
         stop()
 
     # Case 1 · the export page → two cards, one per guest in the order of the file, none for the host
     people = [parse_qs(urlsplit(src).query).get("person", [""])[0] for src, _ in shown]
-    assert people == [ANA_s35a2, XOAN], f"FAIL S35 A2 · cards for {people}, want {[ANA_s35a2, XOAN]}"
+    assert people == [GUEST, XOAN], f"FAIL S35 A2 · cards for {people}, want {[GUEST, XOAN]}"
 
     # Case 2 · each card → its own alt text, with that guest's name and quote and nothing of the other guest
-    for (src, alt), (mine, theirs) in zip(shown, ((ANA_s35a2, XOAN), (XOAN, ANA_s35a2))):
+    for (src, alt), (mine, theirs) in zip(shown, ((GUEST, XOAN), (XOAN, GUEST))):
         assert PERSON[mine] in alt and PERSON[theirs] not in alt, f"FAIL S35 A2 · alt text of {mine}: {alt!r}"
-        assert HOST_s35a2 not in alt and "ustedes nunca" not in alt, f"FAIL S35 A2 · the host is in the alt text of {mine}"
+        assert MODERATOR not in alt and "ustedes nunca" not in alt, f"FAIL S35 A2 · the host is in the alt text of {mine}"
 
     # Case 3 · the page → a series field the person types in
     assert re.search(r'<input\b[^>]*\bname="series"', page), "FAIL S35 A2 · the page has no series field"
@@ -465,7 +399,7 @@ def test_card_per_guest(tmp_path, monkeypatch):
         "FAIL S35 A2 · the series field forgets what the person typed"
 
     # Case 5 · each card image → the series line and its own guest
-    for (src, _), mine in zip(named, (ANA_s35a2, XOAN)):
+    for (src, _), mine in zip(named, (GUEST, XOAN)):
         image = images[src]
         assert SERIES in image, f"FAIL S35 A2 · the card of {mine} lacks the series line"
         assert PERSON[mine] in image, f"FAIL S35 A2 · the card at {src} is not {mine}'s"
@@ -556,7 +490,7 @@ def test_compare_content(tmp_path, monkeypatch, capsys):
     png, txt = out / "compare.png", out / "compare.txt"
     assert str(png) in printed and str(txt) in printed, f"FAIL S36 A1 · the paths are not printed: {printed!r}"
     assert png.exists() and txt.exists(), "FAIL S36 A1 · compare.png or compare.txt is missing"
-    card, alt = visible_compare(png.read_text()), txt.read_text()
+    card, alt = visible(png.read_text()), txt.read_text()
 
     # Case 2 · the header → "Comparativa · 3 entrevistas", the programme and months, "78 datos verificados"
     for want in ("Comparativa · 3 entrevistas", "«La entrevista de las 9» · oct–nov 2026", "78 datos verificados"):
@@ -604,7 +538,7 @@ def test_no_speaking_time(tmp_path, monkeypatch, capsys):
     save(home, MARTA, silent)
     code, printed = compare(home, out, monkeypatch, capsys, "marta36", "nuria36")
     assert code == 0, f"FAIL S36 A1 · compare exited {code}: {printed!r}"
-    nuria = column(visible_compare((out / "compare.png").read_text()), "Núria Vidal", ["Marta Ibarra", "Núria Vidal"])
+    nuria = column(visible((out / "compare.png").read_text()), "Núria Vidal", ["Marta Ibarra", "Núria Vidal"])
 
     # Case 9 · no speaking time → "Graves por hora —" with the count "3 graves", and no "hablando"
     assert "Graves por hora — 3 graves" in nuria, f"FAIL S36 A1 · no '—' per hour: {nuria!r}"
@@ -637,7 +571,7 @@ def test_same_person(tmp_path, monkeypatch, capsys):
     save(home, MARTA, MARTA_2, JORGE)
     code, printed = compare(home, out, monkeypatch, capsys, "marta36", "jorge36", "marta36b")
     assert code == 0, f"FAIL S36 A2 · compare exited {code}: {printed!r}"
-    card, alt = visible_compare((out / "compare.png").read_text()), (out / "compare.txt").read_text()
+    card, alt = visible((out / "compare.png").read_text()), (out / "compare.txt").read_text()
 
     # Case 1 · two interviews of Marta and one of Jorge → two columns, Marta first, and "3 entrevistas" in the header
     assert "Comparativa · 3 entrevistas" in card, f"FAIL S36 A2 · the header lacks '3 entrevistas': {card[:300]!r}"
@@ -659,16 +593,16 @@ def test_same_person(tmp_path, monkeypatch, capsys):
         f"FAIL S36 A2 · the alt text does not add Marta's interviews: {alt!r}"
 
 
-DEBATE_s36a2 = interview("debate36", "Ana Ruiz (invitada)", "Ana Ruiz", spoken_s=1500, claims=8, asked=4, false=1,
+THREE_GUESTS = interview("debate36", "Ana Ruiz (invitada)", "Ana Ruiz", spoken_s=1500, claims=8, asked=4, false=1,
                    misleading=0, nitpicks=0, serious=1, device="false_dilemma", repeats=1, dodged=0)
-DEBATE_s36a2[0]["people"] |= {"Xoán Pereira (invitado)": {"role": "guest", "person": "Xoán Pereira", "spoken_s": 1400},
+THREE_GUESTS[0]["people"] |= {"Xoán Pereira (invitado)": {"role": "guest", "person": "Xoán Pereira", "spoken_s": 1400},
                         "Lucía Prado (invitada)": {"role": "guest", "person": "Lucía Prado", "spoken_s": 1300}}
 
 
 def test_too_many_or_unknown(tmp_path, monkeypatch, capsys):
     home, out = tmp_path / "home", tmp_path / "out"
     out.mkdir()
-    save(home, DEBATE_s36a2, MARTA)
+    save(home, THREE_GUESTS, MARTA)
 
     # Case 4 · a debate of three guests and one interview of Marta → four guests: no card, one line naming them
     code, printed = compare(home, out, monkeypatch, capsys, "debate36", "marta36")

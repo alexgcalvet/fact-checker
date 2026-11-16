@@ -3,6 +3,7 @@ import json
 import re
 
 from fact_checker.cli import GOLDEN, report_marks, run_eval
+from video_fakes import NoPublishedChecks
 
 
 # S3 A2 · The eval scores flags against the expected ones
@@ -117,7 +118,7 @@ FLAGS = [
 CLAIMS = [LINES[4], LINES[5], LINES[6], LINES[7], LINES[3]]
 
 
-class FakeClaude_s3a3:
+class BarsModel:
     def complete(self, prompt, schema, tools=()):
         if "verdicts" in schema["properties"]:
             return {"verdicts": [
@@ -129,18 +130,13 @@ class FakeClaude_s3a3:
                 "claims": [{"quote": q, "speaker": "guest", "queries": [q]} for q in CLAIMS]}
 
 
-class NoPublishedChecks:
-    def search(self, query, language):
-        return []
-
-
 def test_pick_threshold(tmp_path):
     golden = tmp_path / "golden"
     golden.mkdir()
     (golden / "bars.json").write_text(json.dumps(DIALOGUE, ensure_ascii=False))
     saved = tmp_path / "thresholds.json"
 
-    report = run_eval(golden, llm=FakeClaude_s3a3(), factcheck=NoPublishedChecks(), save_to=saved)
+    report = run_eval(golden, llm=BarsModel(), factcheck=NoPublishedChecks(), save_to=saved)
 
     # Case 1 · fallacies right at 0.9 and 0.85, wrong at 0.7 → the lowest bar with precision ≥ 0.80 is 0.85
     assert report["fallacy"]["bar"] == 0.85
@@ -212,9 +208,9 @@ def norm(text):
     return " ".join(re.sub(r"[^\w\s]", "", text.lower()).split())
 
 
-DIALOGUES_s8a3 = [json.loads(p.read_text()) for p in sorted(GOLDEN.glob("*.json"))]
-PLANTED = [(d, e) for d in DIALOGUES_s8a3 for e in d["expected"] if e["type"] == "contradiction"]
-DECOYS = [(d, e) for d in DIALOGUES_s8a3 for e in d["decoys"] if "related" in e]
+GOLDEN_DIALOGUES = [json.loads(p.read_text()) for p in sorted(GOLDEN.glob("*.json"))]
+PLANTED = [(d, e) for d in GOLDEN_DIALOGUES for e in d["expected"] if e["type"] == "contradiction"]
+DECOYS = [(d, e) for d in GOLDEN_DIALOGUES for e in d["decoys"] if "related" in e]
 
 
 def line_of(dialogue, quote):
@@ -232,14 +228,14 @@ def contradiction(dialogue, item, confidence):
             "reason": "Dice lo contrario de lo que dijo antes.", "confidence": confidence}
 
 
-SCRIPTED_s8a3 = [contradiction(d, e, 0.9) for d, e in PLANTED] + [contradiction(d, e, 0.6) for d, e in DECOYS]
+CONTRADICTIONS = [contradiction(d, e, 0.9) for d, e in PLANTED] + [contradiction(d, e, 0.6) for d, e in DECOYS]
 
 
-class FakeClaude_s8a3:
+class ContradictionModel:
     def complete(self, prompt, schema, tools=()):
         part = norm(prompt.split("PART:")[-1])
         return {"flags": [], "claims": [], "questions": [],
-                "contradictions": [dict(c) for c in SCRIPTED_s8a3 if norm(c["quote"]) in part]}
+                "contradictions": [dict(c) for c in CONTRADICTIONS if norm(c["quote"]) in part]}
 
 
 def test_eval_scores_contradictions(capsys):
@@ -255,7 +251,7 @@ def test_eval_scores_contradictions(capsys):
     assert any(not same_speaker(d, e) for d, e in DECOYS)
     assert any(same_speaker(d, e) for d, e in DECOYS)
 
-    report = run_eval(GOLDEN, llm=FakeClaude_s8a3(), factcheck=None)
+    report = run_eval(GOLDEN, llm=ContradictionModel(), factcheck=None)
     out = capsys.readouterr().out
     row = report["contradiction"]
     flagged_decoys = sum(same_speaker(d, e) for d, e in DECOYS)

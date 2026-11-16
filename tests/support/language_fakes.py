@@ -1,16 +1,16 @@
 """The fakes that the S26 tests share: an invented English interview and its Spanish twin as yt-dlp caption
 files, a fake `yt-dlp` that writes only the tracks it is asked for, a fake `claude` that logs every reading and answers by its schema, a failing `codex`, and a
-Fact Check Tools API that records the language of each search.
+Fact Check Tools API that records the language of each search (video_fakes.NoPublishedChecks).
 
 The English video ("enview…") has an English original track (`en-orig`) and a machine-translated Spanish track (`es`)
 that holds none of the English words. The Spanish video ("esview…") has only a Spanish original track (`es-orig`).
 """
 import json
-import os
 import sys
 from pathlib import Path
 
 from fact_checker import server
+from video_fakes import NoPublishedChecks
 
 ATTACK = {"en": "My rival is a liar", "es": "Mi rival es un mentiroso"}
 FALSE = {"en": "unemployment fell by half in one year", "es": "el paro bajó a la mitad en un año"}
@@ -84,18 +84,6 @@ def json3(lines: list[tuple[float, str]]) -> dict:
                        for t, text in lines]}
 
 
-class FactCheck:
-    """The Fact Check Tools API: finds nothing, records (query, language)."""
-    searches: list = []
-
-    def __init__(self, key):
-        pass
-
-    def search(self, query, language):
-        FactCheck.searches.append((query, language))
-        return []
-
-
 def setup(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     """A helper home, the fake commands alone on PATH, the caption files; returns (home, reading log)."""
     bin_dir, captions, home = tmp_path / "bin", tmp_path / "captions", tmp_path / "home"
@@ -116,8 +104,8 @@ def setup(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     monkeypatch.setenv("FACT_CHECK_API_KEY", "invented")
     for name in ("HF_TOKEN", "FACT_CHECK_PROVIDER"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(server, "GoogleFactCheck", FactCheck)
-    FactCheck.searches = []
+    monkeypatch.setattr(server, "GoogleFactCheck", NoPublishedChecks)
+    NoPublishedChecks.searches = []
     return home, log
 
 

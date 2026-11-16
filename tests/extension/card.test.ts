@@ -190,11 +190,7 @@ import { TEXTS } from "../../src/extension/src/texts";
       expect(sent).toEqual([["ad_hominem-42.0", "unfair", "es una pregunta, no un ataque"]]);
     });
 
-    it("Case 2 · ✓ De acuerdo → the mark goes out at once as correct, with no reason", () => {
-      const { sent, button } = page();
-      button("De acuerdo").click();
-      expect(sent).toEqual([["ad_hominem-42.0", "correct", ""]]);
-    });
+    // Case 2 · ✓ De acuerdo → the mark goes out at once as correct, with no reason: S27 A4 Case 4
   });
 }
 
@@ -559,15 +555,12 @@ import { TEXTS } from "../../src/extension/src/texts";
       expect(sent).toEqual([]);
     });
 
-    // Case 3 · a card marked correct → "Marcaste: ✓ De acuerdo"
-    it("Case 3 · a card marked correct → \"Marcaste: ✓ De acuerdo\"", () => {
-      const { card } = page("correct");
-      expect(card().textContent).toContain("Marcaste: ✓ De acuerdo");
-    });
+    // Case 3 · a card marked correct → "Marcaste: ✓ De acuerdo": S27 A4 Case 5
   });
 }
 
 // S27 A4 · Each card asks the question with two large buttons
+// S4 A1 (extension part) · "✓ De acuerdo" sends "correct" at once (Case 4); S13 A4 · a card marked correct (Case 5)
 //
 // Story: A person with a Spanish browser sees a fallacy card: its foot reads "¿Es justo este aviso?" with the buttons
 // "✓ De acuerdo" and "✗ No", taller than the card's other text buttons. In English they read "Is this flag fair?",
