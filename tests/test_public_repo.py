@@ -14,7 +14,7 @@ from pathlib import Path
 
 REPO = Path(__file__).parents[1]
 PATTERN = "feij|sánchez|sanchez|1YlGArMx_N4|mStOFBvToUI|ábalos|koldo|óscar puente|Óscar Puente|évole|Évole"
-RESEARCH_SOURCE = re.compile(r"^docs/research/[^:]+:[0-9]+:- \[[^]]*\]\(https?://")
+RESEARCH_SOURCE = re.compile(r"^docs/(archive/[^/]+/)?research/[^:]+:[0-9]+:- \[[^]]*\]\(https?://")
 
 
 def git(*args: str) -> list[str]:
@@ -24,7 +24,7 @@ def git(*args: str) -> list[str]:
 
 # Case 1 · the content of the tracked files → no real name or real video id
 def test_no_real_names_in_tracked_files():
-    hits = git("grep", "-niE", PATTERN, "--", ".", ":!tests/test_public_repo.py", ":!docs/specs/030-ready-to-publish/")
+    hits = git("grep", "-niE", PATTERN, "--", ".", ":!tests/test_public_repo.py", ":!docs/archive/*/specs/030-ready-to-publish/")
     hits = [h for h in hits if not RESEARCH_SOURCE.match(h)]
     assert not hits, f"FAIL S30 A4 · real names or video ids in tracked files: {hits}"
 

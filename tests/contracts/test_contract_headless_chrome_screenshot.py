@@ -1,6 +1,6 @@
 """Contract · Headless Chrome · screenshot
 
-The person's installed Chrome, called with the command of docs/research/external-contracts.md, turns a small
+The person's installed Chrome, called with the command of docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/research/external-contracts.md, turns a small
 page into a PNG whose fields (format, width, height, exit code) have the same names and types as the recorded
 fake in tests/fakes/headless-chrome/screenshot.json, and whose size is the window size it was given. Values of
 the fake are never compared. Skips when Chrome is not installed at its macOS path.

@@ -456,7 +456,7 @@
   <div>
     <h1>fact-checker</h1>
     <p>A Chrome extension and a local helper that put fact checks, contradictions, fallacies and dodged questions on a YouTube video, at the second they are said. This page describes the code as it is today.</p>
-    <span class="stamp" data-commit="c64c411">Generated at c64c411 · 2026-11-15</span>
+    <span class="stamp" data-commit="41d2cd9">Generated at 41d2cd9 · 2026-11-16</span>
   </div>
   <div class="actions">
     <button id="search-open" type="button">Search<kbd>⌘K</kbd></button>
@@ -581,7 +581,7 @@
   PIPE -->|"claim queries"| FC
   PIPE -->|"search queries"| SRCH
   SRV -->|"flags"| STORE
-  STORE -->|"flags marked correct"| SUM
+  STORE -->|"flags the judge keeps"| SUM
   SRV -->|"marks"| FB
   SRV -->|"whole analysis"| SHA
   FB -->|"marks"| COL
@@ -604,6 +604,7 @@
   PIPE["Pipeline"]
   STORE[("Flag store")]
   COL["Collector"]
+  SUM["Summary"]
   BACK["Backend · STEP 2"]
   WEB["Web player page · STEP 2"]
   REP["Report page · STEP 2"]
@@ -619,11 +620,13 @@
   BACK -.->|"runs unchanged"| PIPE
   BACK -.->|"flag file"| WEB
   BACK -.->|"flag file"| REP
+  SRV -->|"profile card"| SUM
+  SUM -.->|"card links here"| WEB
   LIVE -.->|"live transcript"| BACK
   class BACK,WEB,REP,CAP,LIVE planned
   classDef service,compute,data,external stroke-width:1px
   class EXT,SRV,COL service
-  class PIPE compute
+  class PIPE,SUM compute
   class STORE data</pre>
     </figure>
 
@@ -653,8 +656,7 @@
         <h3>fact-checker</h3>
         <p class="role">A Chrome extension, a Python helper on the viewer's machine, and the owner's collector on Cloudflare. Step 1 of the target: recorded videos in Spanish and English.</p>
         <dl class="facts"><div><dt>Budget</dt><dd>60 model readings per started video-hour, per role</dd></div><div><dt>First part</dt><dd>30 s, then 2 min each, up to 3 at once</dd></div><div><dt>Helper</dt><dd>127.0.0.1:8765–8769</dd></div><div><dt>LLM providers</dt><dd>5</dd></div></dl>
-        <div class="questions"><h4>Open questions</h4><ul><li>ARCHITECTURE still marks S5–S39 as proposed, but their code exists: run <code>/rfc sync</code>.</li><li>The working tree holds uncommitted changes in <code>judge.py</code>, <code>pipeline.py</code>, <code>server.py</code> and <code>llm_claude_cli.py</code>; the prompts tab copies the working tree.</li></ul></div>
-      </article>
+              </article>
     </aside>
     </div>
   </section>
@@ -665,7 +667,7 @@
       <summary><span class="i3-tag">What you see</span><span class="i3-sum">Three steps from a personal tool to a shared one and to live streams. Switch the map to "View: target" to see what each one adds.</span><span class="i3-more">How it works and why</span></summary>
       <div class="i3-grid">
         <div class="i3"><h4>What you see</h4><p>The way in one paragraph, the steps in order, and the seams that today's code keeps open.</p></div>
-        <div class="i3"><h4>What happens</h4><p>Step 1 is in progress in <code>docs/RFC.md</code>. Steps 2 and 3 start only after Step 1 meets its precision target.</p></div>
+        <div class="i3"><h4>What happens</h4><p>Step 1 is done: its RFC is archived as <code>docs/archive/001-…</code>. Step 2 is next and starts with a new RFC.</p></div>
         <div class="i3"><h4>Why</h4><p>Recorded videos first: no latency pressure, cheaper, and testable on a golden dataset.</p></div>
       </div>
     </details>
@@ -681,7 +683,7 @@
       <table>
         <thead><tr><th>Step</th><th>Delivers</th><th>Depends on</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td>Step 1</td><td>The person and beta testers see flags on youtube.com for any recorded Spanish or English video; an approved analysis is shared with later viewers</td><td>none</td><td>in progress</td></tr>
+          <tr><td>Step 1</td><td>The person and beta testers see flags on youtube.com for any recorded Spanish or English video; an approved analysis is shared with later viewers</td><td>none</td><td>done</td></tr>
           <tr><td>Step 2</td><td>Anyone sees flags in the extension, on a web page or in a shared report; each video is analysed once, on a server</td><td>Step 1</td><td>planned</td></tr>
           <tr><td>Step 3</td><td>Flags on live streams within seconds</td><td>Step 2</td><td>planned</td></tr>
         </tbody>
@@ -703,7 +705,7 @@
       <ul class="why">
         <li><b>Flags over the player only in the extension.</b> YouTube API policies forbid covering an embedded player, so the web page shows them beside it.</li>
         <li><b>Each person pays their own readings in Step 1.</b> The owner pays only the collector, on the free plan.</li>
-        <li><b>Step 2 budget: at most €3 per video-hour</b> (docs/research/interview-youtube-fact-checker.md), so a free tier stays viable.</li>
+        <li><b>Step 2 budget: at most €3 per video-hour</b> (docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/research/interview-youtube-fact-checker.md), so a free tier stays viable.</li>
       </ul>
     </div>
     </div>
@@ -838,7 +840,7 @@
         <li data-node="CHR"><b>Load on youtube.com</b><p>A Manifest V3 content script runs on each watch page, reads the video id and the player's current second, and draws in the page. A background service worker does every fetch to the helper, because only it may call <code>127.0.0.1</code>.</p><p class="meta">src/extension/manifest.json · src/extension/src/content.ts · sw.ts</p></li>
         <li data-node="SRV"><b>Find the helper</b><p>The service worker asks <code>/health</code> on ports 8765 to 8769 and keeps the first one that answers as fact-checker. If none answers, the extension says that the helper is down, with the fix.</p><p class="meta">src/extension/src/sw.ts</p></li>
         <li data-node="EXT"><b>Poll and draw</b><p>Each poll sends the playback second and gets the flag file so far. A flag with <code>on_player: true</code> shows as a card on the player for 8 seconds, unless the viewer pins it. Every flag appears in the side panel and as a mark on the strip under the video, so a click jumps to its second.</p><p class="meta">src/extension/src/overlay.ts · panel.ts · flags.ts</p></li>
-        <li data-node="P"><b>Mark and set</b><p>A vote on a card says whether the flag is correct or unfair, with a reason. The ⚙ menu holds the language (Spanish or English, from the browser by default), sharing, and quiet mode, which shows only serious flags. The settings live in <code>chrome.storage</code>; the sharing answer goes to the helper.</p><p class="meta">src/extension/src/panel.ts · texts.ts · _locales/</p></li>
+        <li data-node="P"><b>Mark and set</b><p>A vote on a card says whether the flag is correct or unfair, with a reason. The ⚙ menu holds the language (Spanish or English, from the browser by default), sharing, and quiet mode, which shows only serious flags. Keys opens the helper's key page in a new tab. The settings live in <code>chrome.storage</code>; the sharing answer goes to the helper.</p><p class="meta">src/extension/src/panel.ts · texts.ts · _locales/</p></li>
         <li data-node="SUM"><b>Export a card</b><p>For a finished video, a button opens the helper's summary page: the profile card of each guest as an image, with its alt text ready to copy.</p><p class="meta">src/extension/src/panel.ts</p></li>
       </ol>
     </div>
@@ -911,9 +913,9 @@
       <h3>How it works</h3>
       <ol class="walk">
         <li data-node="UV"><b>Install in one step</b><p><code>install.sh</code> installs uv, yt-dlp, ffmpeg (from the imageio-ffmpeg wheel) and the helper, each only if missing, then runs <code>setup</code>. A person can also tell their AI agent to follow <code>INSTALL-AGENT.md</code>, and the agent names its own provider.</p><p class="meta">install.sh · INSTALL-AGENT.md</p></li>
-        <li data-node="INST"><b>Set up and check</b><p><code>setup</code> checks claude or codex (logged in), uv, yt-dlp, ffmpeg and Chrome. It writes <code>config.toml</code> with the logged-in agent CLI, copies the extension, and starts the helper at login: a launchd agent on macOS, a systemd user service on Linux. <code>doctor</code> prints one line per check with its fix, and <code>key set</code> stores a key from a hidden prompt.</p><p class="meta">src/helper/fact_checker/install.py</p></li>
-        <li data-node="SRV"><b>Serve on localhost</b><p><code>serve</code> takes the first free port of 8765–8769 and answers <code>/health</code>, so the extension and doctor can tell it from another program. It picks the provider and model of each <a class="term" href="#term-role">role</a> from <code>config.toml</code>, runs one analysis per video in a thread, and follows the playback second of each poll.</p><p class="meta">src/helper/fact_checker/server.py</p></li>
-        <li data-node="CLI"><b>Run by hand</b><p>The CLI runs the same work without the extension: <code>analyze &lt;url&gt;</code> reads a whole video, <code>judge &lt;id&gt;</code> reruns the judge, <code>eval</code> scores the golden dataset, and <code>feedback</code> and <code>shared</code> talk to the collector.</p><p class="meta">src/helper/fact_checker/cli.py</p></li>
+        <li data-node="INST"><b>Set up and check</b><p><code>setup</code> checks claude or codex (logged in), uv, yt-dlp, ffmpeg and Chrome. It writes <code>config.toml</code> with the logged-in agent CLI, copies the extension, and starts the helper at login: a launchd agent on macOS, a systemd user service on Linux. <code>setup --provider</code> takes the provider that the installing agent names, finds the Codex inside the ChatGPT app, and refuses a <code>claude</code> inside the Claude app's versioned folder, which breaks on the next app update. If launchd refuses the helper, as it does inside an agent's sandbox, setup names the error and asks to run outside the sandbox. <code>doctor</code> prints one line per check with its fix, including the tools that the login helper finds on its own PATH. <code>provider</code> prints or switches the provider and restarts the helper.</p><p class="meta">src/helper/fact_checker/install.py</p></li>
+        <li data-node="SRV"><b>Serve on localhost</b><p><code>serve</code> takes the first free port of 8765–8769 and answers <code>/health</code>, so the extension and doctor can tell it from another program; <code>/health</code> also says which tools the helper finds on its own PATH. Its key page, <code>/keys</code>, takes a key in a hidden field, so a key never goes through a chat or a terminal. It picks the provider and model of each <a class="term" href="#term-role">role</a> from <code>config.toml</code>, runs one analysis per video in a thread, and follows the playback second of each poll.</p><p class="meta">src/helper/fact_checker/server.py</p></li>
+        <li data-node="CLI"><b>Run by hand</b><p>The CLI runs the same work without the extension: <code>analyze &lt;url&gt;</code> reads a whole video, <code>judge &lt;id&gt;</code> reruns the judge with two readings, <code>compare</code> puts up to three guests on one card, <code>eval</code> scores the golden dataset, and <code>feedback</code> and <code>shared</code> talk to the collector.</p><p class="meta">src/helper/fact_checker/cli.py</p></li>
         <li data-node="STORE"><b>Keep the result</b><p>Each video has one flag file in <code>~/.fact-checker/videos/</code>. The helper writes it after each part, so a poll always gets the flags so far, and a finished file is served again with no new reading.</p><p class="meta">src/helper/fact_checker/store.py</p></li>
       </ol>
     </div>
@@ -995,17 +997,17 @@
         <li data-node="PIPE"><b>Read the part</b><p>One reading returns the fallacies from a closed list of 11 labels, the checkable claims, the questions with how they were answered, the contradictions with an earlier statement, at most 2 context cards, and the new positions of each speaker. The quote of each item is matched to the caption words to find its exact second and voice.</p><p class="meta">core/pipeline.py (analyze_chunk)</p>
           <p class="ww"><span class="w-tag no">Without context</span>A part alone cannot see that the speaker said the opposite 20 minutes ago.</p>
           <p class="ww"><span class="w-tag yes">With it</span>In <a class="term" href="#term-conversation">conversation mode</a>, one model session reads the parts in order; a <a class="term" href="#term-positions">positions list</a> of up to 60 lines carries what each speaker stated earlier in the video.</p></li>
-        <li data-node="FC"><b>Check the claims</b><p>Only claims marked central and not repeating an earlier one go on. Published fact-checks come first; then a search reading gathers evidence and a verdict reading, with no tools, judges it. The code, not the model, decides the label: one credible measure for the figure and one against make it <code>disputed</code>; <code>false</code> needs every credible measure against it and one from tier 1–3.</p><p class="meta">core/factcheck.py · adapters/factcheck_google.py</p></li>
-        <li data-node="JDG"><b>Judge the whole</b><p>When every part is done, one reading per started two video-hours sees the whole transcript with speakers and rules on each flag: <code>keep</code>, or <code>nitpick</code> for a small slip. It rates each kept flag minor, moderate or serious by materiality, centrality and magnitude, never intent, and can correct the speaker.</p><p class="meta">core/judge.py</p></li>
+        <li data-node="FC"><b>Check the claims</b><p>Only claims marked central and not repeating an earlier one go on. Published fact-checks come first; then a search reading gathers evidence and a verdict reading, with no tools, judges it. The code, not the model, decides the label: one credible measure for the figure and one against make it <code>disputed</code>; <code>false</code> needs every credible measure against it and one from tier 1–3. A figure from the speaker's own government, party or administration never backs the speaker by itself: with only that measure, the verdict is at least <code>disputed</code>.</p><p class="meta">core/factcheck.py · adapters/factcheck_google.py</p></li>
+        <li data-node="JDG"><b>Judge the whole</b><p>When every part is done, one reading per started two video-hours sees the whole transcript and rules on each flag: <code>keep</code>, or <code>nitpick</code> for a small slip. Each name is replaced by a role and a number, such as "Invitado 1", so the ruling is about what was said, not who said it. The judge rules on the reading, never on the facts again: if it doubts the facts, it keeps the flag. It rates each kept flag minor, moderate or serious by materiality, centrality and magnitude, never intent, and can correct the speaker.</p><p class="meta">core/judge.py</p></li>
       </ol>
     </div>
     </div>
     <div class="cols">
       <div class="card"><h3>Why this way</h3><ul class="why">
         <li><b>A cheaper model searches, a strong one judges; central claims only, once per video.</b> About 70 % of a video's cost was strong-model fact-checks resending every search result. Beat: one model for both, every figure checked.</li>
-        <li><b>An official figure is not the truth by itself.</b> Sources weigh by a tier of independence, so the checker does not take a side. Beat: official data as ground truth.</li>
+        <li><b>An official figure is not the truth by itself.</b> Sources weigh by a tier of independence, and the speaker's own side's figure never proves them right alone, because governments and parties also give false or framed figures. Beat: official data as ground truth.</li>
         <li><b>A closed list of fallacy labels.</b> Each is visible in the words and has few false positives; any other goes to <code>candidates.log</code>, never the screen. Beat: an open list.</li>
-        <li><b>The judge never drops a flag.</b> Rule <code>keep</code> or <code>nitpick</code> only, so it stays reversible. Beat: rewriting or deleting flags.</li>
+        <li><b>The judge never drops a flag, and judges blind to names.</b> Rule <code>keep</code> or <code>nitpick</code> only, so it stays reversible; the fact-check already weighed the sources, and a name must not sway the ruling. Beat: rewriting or deleting flags; a judge that searches again.</li>
       </ul></div>
       <div class="card"><h3>Limits</h3><ul class="limits">
         <li><b>Repeats in flight.</b> With 3 parts at once, a claim repeated in a part still being read is checked twice.</li>
@@ -1231,7 +1233,7 @@
   COL -->|"approved analysis"| SHA
   COL -->|"rows in D1"| CF
   OWN -->|"approve or reject"| COL
-  SRV -->|"flags marked correct"| SUM
+  SRV -->|"flags the judge keeps"| SUM
   THUMB -->|"hero image"| SUM
   SUM -->|"card page"| HC
   HC -->|"1080×1350 PNG"| SRV
@@ -1246,8 +1248,8 @@
         <li data-node="FB"><b>Send each mark</b><p>After the person says yes once, each mark sends itself in the background, in batches of up to 50. A mark given with sharing off is kept with <code>shared: false</code> and never leaves. The owner reads all marks with <code>feedback pull</code>.</p><p class="meta">src/helper/fact_checker/feedback.py</p></li>
         <li data-node="SHA"><b>Upload a whole analysis</b><p>When an analysis is done, the helper uploads it stripped to the shared fields: no file paths, no install id inside. It waits as pending until the owner approves it, unless the owner uploads it with the admin token.</p><p class="meta">src/helper/fact_checker/analyses.py</p></li>
         <li data-node="COL"><b>Keep and guard</b><p>The collector, a Cloudflare Worker with a D1 database, keeps marks and analyses with hard stops per install id: 20 mark requests and 10 uploads per UTC day. A served analysis is replaced only by one from a higher-ranked parts model.</p><p class="meta">src/collector/src/index.ts · schema.sql</p></li>
-        <li data-node="OWN"><b>Approve</b><p>The owner lists pending uploads with <code>fact-checker shared list</code>, and approves or rejects each. An approved analysis is also a public read-only page at <code>/a/&lt;video_id&gt;</code> with each flag, its severity, its sources and the rubric.</p><p class="meta">src/helper/fact_checker/cli.py · src/collector/src/index.ts</p></li>
-        <li data-node="SUM"><b>Make the card</b><p>For each guest, the summary counts only the flags marked correct, fills an HTML card in the CALVET brand with bundled fonts, and headless Chrome turns it into a 1080×1350 PNG with alt text of at most 1,000 characters. A comparison card puts up to three people side by side, once every flag of each is marked.</p><p class="meta">core/summary.py · summary.html · adapters/screenshot.py · adapters/thumbnail.py</p></li>
+        <li data-node="OWN"><b>Approve</b><p>The owner lists pending uploads with <code>fact-checker shared list</code>, and approves or rejects each.</p><p class="meta">src/helper/fact_checker/cli.py · src/collector/src/index.ts</p></li>
+        <li data-node="SUM"><b>Make the card</b><p>For each guest, the summary counts the flags that the judge keeps, and a mark wins over the judge: an <code>unfair</code> mark counts nowhere. It fills an HTML card in the CALVET brand with bundled fonts, and headless Chrome turns it into a 1080×1350 PNG with alt text of at most 1,000 characters. <code>fact-checker compare</code> puts up to three guests side by side on one card, matched by their full name across videos, with rates per hour of speech and no score.</p><p class="meta">core/summary.py · summary.html · compare.html · adapters/screenshot.py · adapters/thumbnail.py</p></li>
       </ol>
     </div>
     </div>
@@ -1260,7 +1262,7 @@
       </ul></div>
       <div class="card"><h3>Limits</h3><ul class="limits">
         <li><b>The owner reviews every upload by hand.</b> That is the first limit on growth.</li>
-        <li><b>The card needs marks.</b> Without flags marked correct, a guest's card is empty.</li>
+        <li><b>The card has no link yet.</b> The sources behind each number stay in the extension; the web player page of Step 2 is where the card will link.</li>
       </ul></div>
     </div>
     </div>
@@ -1373,7 +1375,7 @@
           <tr><td><code>usage.log</code></td><td>LLM adapter, per reading</td><td><code>ts, video_id, step, chunk_start, duration_s, lead_s</code>, tokens, <code>cost_usd</code>, <code>model</code>, <code>session</code></td></tr>
           <tr><td><code>candidates.log</code></td><td>Pipeline</td><td>A fallacy outside the closed list, for the person to review; never shown</td></tr>
           <tr><td><code>config.toml</code></td><td>Install; <code>POST /share</code></td><td>Provider, models per role, <code>feedback_url</code>, <code>share_marks</code>, <code>screen</code></td></tr>
-          <tr><td><code>.env</code></td><td><code>fact-checker key set</code></td><td>Keys, mode 600</td></tr>
+          <tr><td><code>.env</code></td><td><code>fact-checker key set</code>, the key page <code>/keys</code></td><td>Keys, mode 600</td></tr>
           <tr><td><code>captions/</code>, <code>thumbnails/</code></td><td>Transcript adapter, Summary</td><td>Cached captions and hero images</td></tr>
           <tr><td><code>install-id</code>, <code>feedback-sent.json</code>, <code>feedback/</code></td><td>Feedback</td><td>A random UUID, the marks already sent, the owner's pulled marks</td></tr>
           <tr><td><code>extension/</code></td><td>Install</td><td>The built extension that Chrome loads</td></tr>
@@ -1435,6 +1437,7 @@
               <tr><td><code>cost_usd</code></td><td class="plain">Sum of the cost of every reading of the video</td></tr>
               <tr><td><code>speakers, people</code></td><td class="plain">Name of each voice; per name <code>{role, person, spoken_s, set_by}</code></td></tr>
               <tr><td><code>readers</code></td><td class="plain">Provider and model of each role that read the video</td></tr>
+              <tr><td><code>claims, questions</code></td><td class="plain">Per speaker name: <code>claims</code> <code>{checked, correct}</code>, <code>questions</code> the number of questions put to them; numbers only, shared with the analysis</td></tr>
               <tr><td><code>first_flags_s</code></td><td class="plain">Seconds from start to the first part written</td></tr>
               <tr><td><code>source</code></td><td class="plain"><code>shared</code> when the file came from the collector</td></tr>
               <tr><td><code>mark</code></td><td class="plain">On GET only: the person's latest verdict, correct or unfair</td></tr>
@@ -1456,7 +1459,8 @@
           <tr><td><code>GET /videos/&lt;id&gt;/summary.png?person=</code>, <code>summary.txt</code>, <code>summary</code></td><td>A guest's card, its alt text, a page with both</td></tr>
           <tr><td><code>GET /share</code>, <code>POST /share</code></td><td>Read or write the sharing answer</td></tr>
           <tr><td><code>GET /provider</code></td><td>The provider of the parts role, for the spend line</td></tr>
-          <tr><td><code>GET /health</code></td><td><code>{app, version, pid, home, writable}</code></td></tr>
+          <tr><td><code>GET /health</code></td><td><code>{app, version, pid, home, writable, tools}</code>: <code>tools</code> says which commands the helper finds on its own PATH</td></tr>
+          <tr><td><code>GET /keys</code>, <code>POST /keys</code></td><td>The key page: each key the roles need, as missing or saved; a POST writes <code>.env</code> and sets the key in the running helper. Host and Origin must be <code>127.0.0.1:&lt;port&gt;</code></td></tr>
         </tbody>
       </table></div>
     </figure>
@@ -1471,7 +1475,6 @@
           <tr><td><code>PUT /analyses/&lt;id&gt;?lang=</code></td><td>a helper</td><td>A done analysis, ≤ 1 MB, ≤ 1,000 flags: pending (202), or served with the token; 409 if a better-ranked one is served</td></tr>
           <tr><td><code>GET /analyses/&lt;id&gt;?lang=</code></td><td>any helper</td><td>The approved analysis, or 404</td></tr>
           <tr><td><code>GET /analyses</code>, <code>POST …/approve|reject</code>, <code>DELETE</code></td><td>owner</td><td>Review the pending uploads; remove a served one</td></tr>
-          <tr><td><code>GET /a/&lt;id&gt;?lang=</code></td><td>anyone</td><td>A read-only HTML page of the approved analysis</td></tr>
         </tbody>
       </table></div>
     </figure>
@@ -1512,7 +1515,7 @@
     </details>
     <div class="layout">
     <div class="figures">
-    <p class="lead">These are the prompts of the helper as they are in the working tree on 2026-11-15, copied word for word by a script. A text in <code>{braces}</code> is a placeholder that the code fills before the reading; the table under each prompt says with what. The prompts are written in English for both languages, and only the placeholders change with the language.</p>
+    <p class="lead">These are the prompts of the helper as they are in the code at <code>41d2cd9</code>, copied word for word by a script. A text in <code>{braces}</code> is a placeholder that the code fills before the reading; the table under each prompt says with what. The prompts are written in English for both languages, and only the placeholders change with the language.</p>
     <figure class="card">
       <figcaption><h3>The readings, in order</h3><p>Which prompt runs at each step of one video.</p></figcaption>
       <div class="x-pipe"><span class="pp" data-kind="compute">Name the voices</span><span class="pa">then, per part</span><span class="pp" data-kind="compute">Screen</span><span class="pa">read: true</span><span class="pp" data-kind="compute">Read a part</span><span class="pa">central claims</span><span class="pp" data-kind="compute">Gather the evidence</span><span class="pa">evidence</span><span class="pp" data-kind="compute">Give the verdicts</span><span class="pa">every part done</span><span class="pp" data-kind="compute">Judge every flag</span></div>
@@ -1674,7 +1677,8 @@ For each flag:
 Also list the checkable claims of the PART: concrete figures, dates, rankings or facts that public data
 can confirm or refute (not opinions, new promises or predictions). Also list a statement that a plan,
 programme or building already exists or was done. Also list a statement of the speaker about what they
-said before (&quot;nunca dije que…&quot;) and a statement about a promise of the speaker or their side: whether it
+said before (&quot;nunca dije que…&quot;), about their own past conduct or ties (where they were, whom they knew or spoke
+with, what they decided: &quot;no me fui de vacaciones&quot;, &quot;con él casi no tenía relación&quot;) and a statement about a promise of the speaker or their side: whether it
 was kept, or figures of what was delivered toward it. When an answer to a question gives a figure, also list
 the words of the answer that say what the figure counts as a claim of their own (such as &quot;entregadas o en
 proceso&quot;, &quot;delivered or in process&quot;), because they may count something other than what was asked. Also list a figure that the speaker
@@ -1685,15 +1689,17 @@ confirm or refute it. For each claim:
 - queries: up to 3 short {spoken} search queries to find a published fact-check of it.
 - question: the question that another speaker asked just before the claim, copied from the PART or the
   CONTEXT, or null.
-- kind: own_words for a statement about what the speaker said before, promise for a statement about a
+- kind: own_words for a statement about what the speaker said or did before, or about their own past conduct
+  or ties, promise for a statement about a
   promise of the speaker or their side or its progress, else fact.
 - central: true by default for any figure or fact about public life: it answers the question asked, it
   carries the speaker&#x27;s argument, it describes a public event or a figure of the topic under discussion (also
   as background, such as how many people crossed a border), or it is a figure of the speaker&#x27;s record or of a
   rival&#x27;s. False only for a personal anecdote, a fact nobody disputes (a capital, who governs), a figure the
   speaker quotes in order to reject it, or a figure of another topic said in passing and never used again.
-- repeats: the number of the CHECKED line that states the same figure or fact, said again in other words,
-  else null.
+- repeats: the number of the CHECKED line that states the same figure for the same thing, or the same fact
+  about the same event, said again in other words, else null. A claim on the same topic with another figure,
+  date, event or person is not a repeat, and an own_words claim repeats only the same statement.
 
 Also list each question that one speaker (usually the interviewer) asks another, in the PART or the
 CONTEXT, whose answer ends inside the PART: the next question or a new topic starts in the PART. Skip an
@@ -1741,8 +1747,7 @@ yes or no on a measure, or a figure they give as their own, that they could cont
 - summary: one short, neutral sentence, in {spoken} like the conversation, such as &quot;no quitará el Ministerio de Igualdad&quot; or &quot;will
   not close the Department of Education&quot;.
 
-Do not use any tool. Answer only with the JSON.
-</pre></div></div></details>
+Do not use any tool. Answer only with the JSON.</pre></div></div></details>
 <details class="x-more"><summary>DATA: message in window mode, and the first part of a conversation <span class="x-msg">src/helper/fact_checker/core/pipeline.py</span></summary><div class="x-in"><div class="x-mock"><div class="x-bar"><span>DATA: message in window mode, and the first part of a conversation</span></div><pre class="x-code">CHECKED (claims already checked earlier in the video, numbered):
 {checked}
 
@@ -2035,7 +2040,8 @@ official and primary sources: {sources}. Make at most 2 searches per claim. Do n
 title, snippet and date that the search results show.
 For a claim with a figure, look for each credible measure of it, the ones that support the claim and the ones
 that do not.
-For an own_words claim, search the speaker&#x27;s earlier public statements: {earlier}.
+For an own_words claim, search the speaker&#x27;s earlier public statements and records of their conduct
+(interviews, their own posts on social networks, official agendas, news of the time): {earlier}.
 For a promise claim, find the original promise and its status on the publish date.
 For a figure of the effect of a rule or a measure (a saving, a margin, a cost), search how the rule works: what
 it takes away as well as what it gives.
@@ -2132,7 +2138,11 @@ in `note`.
 Use only the EVIDENCE listed under each claim and the published fact-checks listed under it.
 Do not use any tool. Cite only the urls of the evidence and of the published fact-checks.
 A published fact-check counts only when it is about the same event as the claim: the same place, dates and facts.
-An official figure is not the truth by itself: a metric can be defined or framed to fit a side. For a
+An official figure is not the truth by itself: a metric can be defined or framed to fit a side, and governments and
+parties also give false figures. A measure produced by the speaker&#x27;s own government, party or an administration they
+lead or led never supports the speaker&#x27;s claim by itself: it needs an independent measure (a statistics office,
+Eurostat, a central bank, a fiscal council, a court, documents published by the press). With only the speaker&#x27;s own
+side&#x27;s measure, the verdict is at least disputed, and the reason says that only their own side gives that figure. For a
 claim with a figure, list each credible measure of it, the ones that support the claim and the ones
 that do not. Give each measure the tier of its producer:
 {tiers}
@@ -2140,7 +2150,9 @@ that do not. Give each measure the tier of its producer:
 Two more ways a claim can mislead:
 - definition_swap: the speaker answers a question about one metric with a wider or different one (asked
   for homes delivered, answers with homes &quot;delivered or in process&quot;). Only when the question is listed
-  under the claim.
+  under the claim. It also covers an answer to a criticism of one thing with a figure of another (criticised
+  for the upkeep of a line, answers with the investment in renewing it), when the figure does not measure
+  what was criticised.
 - plan_as_fact: the speaker talks about a plan, a programme or homes as if they already existed or were
   done, while a dated source shows they are still announced, planned or in progress.
 A figure of the effect of a rule or a measure (a saving, a margin, a cost) must follow from how the rule works.
@@ -2188,11 +2200,16 @@ official and primary sources: {sources}. Make at most 2 searches per claim. Do n
 title, snippet and date that the search results show.
 For a claim with a figure, look for each credible measure of it, the ones that support the claim and the ones
 that do not.
-For an own_words claim, search the speaker&#x27;s earlier public statements: {earlier}.
+For an own_words claim, search the speaker&#x27;s earlier public statements and records of their conduct
+(interviews, their own posts on social networks, official agendas, news of the time): {earlier}.
 For a promise claim, find the original promise and its status on the publish date.
 For a figure of the effect of a rule or a measure (a saving, a margin, a cost), search how the rule works: what
 it takes away as well as what it gives.
-An official figure is not the truth by itself: a metric can be defined or framed to fit a side. For a
+An official figure is not the truth by itself: a metric can be defined or framed to fit a side, and governments and
+parties also give false figures. A measure produced by the speaker&#x27;s own government, party or an administration they
+lead or led never supports the speaker&#x27;s claim by itself: it needs an independent measure (a statistics office,
+Eurostat, a central bank, a fiscal council, a court, documents published by the press). With only the speaker&#x27;s own
+side&#x27;s measure, the verdict is at least disputed, and the reason says that only their own side gives that figure. For a
 claim with a figure, list each credible measure of it, the ones that support the claim and the ones
 that do not. Give each measure the tier of its producer:
 {tiers}
@@ -2200,7 +2217,9 @@ that do not. Give each measure the tier of its producer:
 Two more ways a claim can mislead:
 - definition_swap: the speaker answers a question about one metric with a wider or different one (asked
   for homes delivered, answers with homes &quot;delivered or in process&quot;). Only when the question is listed
-  under the claim.
+  under the claim. It also covers an answer to a criticism of one thing with a figure of another (criticised
+  for the upkeep of a line, answers with the investment in renewing it), when the figure does not measure
+  what was criticised.
 - plan_as_fact: the speaker talks about a plan, a programme or homes as if they already existed or were
   done, while a dated source shows they are still announced, planned or in progress.
 A figure of the effect of a rule or a measure (a saving, a margin, a cost) must follow from how the rule works.
@@ -2467,6 +2486,15 @@ CONVERSATION ({start} to {end}), each line with its minute and its speaker:
 </pre></div></div></details>
 <details class="x-more"><summary>RULES (inserted at {rules}) <span class="x-msg">src/helper/fact_checker/core/judge.py</span></summary><div class="x-in"><div class="x-mock"><div class="x-bar"><span>RULES (inserted at {rules})</span></div><pre class="x-code">- Never drop a flag: each one quotes words said in the conversation, and most are right. Rule &quot;keep&quot; or
   &quot;nitpick&quot; only.
+- You rule on the reading, never on the facts. The fact check already weighed the sources; you do not search and
+  you do not check again. Rule &quot;nitpick&quot; only for a reason of reading: who said it, what exactly was claimed, or a
+  small error by the rules below. Never rule &quot;nitpick&quot; because a source, an official figure or a government says the
+  speaker is right: governments and parties also give false or framed figures. If you doubt the facts, keep the flag.
+- A nitpick needs a reason that the flag&#x27;s own sources or the conversation give. &quot;It cannot be checked&quot;, &quot;it is a
+  valuation&quot; or &quot;the size backs it&quot; are not reasons: if the flag cites a record or a measure against the speaker, keep
+  it. A figure more than about 1.4 times from the closest credible measure is never a nitpick.
+- A figure from the speaker&#x27;s own government, party or an administration they lead or led never makes the speaker
+  right by itself.
 - Materiality. If the substance of a figure holds and the error is small (about 10-15 %, or a near date),
   the verdict is &quot;nitpick&quot;, never &quot;keep&quot;.
 - Direction. An error that does not strengthen the speaker&#x27;s own argument is never misleading or false.
@@ -2479,10 +2507,12 @@ CONVERSATION ({start} to {end}), each line with its minute and its speaker:
   question from the host is the host&#x27;s line, not the guest&#x27;s.
 - Roles. A rhetorical question that a speaker asks himself and then answers is not an evasion. A host who
   says &quot;you do it too&quot; is challenging the guest, not making a tu quoque. Rule such a flag &quot;nitpick&quot;.
-- Fair reading. If the claim is true on a reasonable reading of the speaker&#x27;s words, or the reason leaves out a
-  fact that speaks for the speaker (a detention without charges, a later ruling), the verdict is &quot;nitpick&quot;.
+- Fair reading. If the claim is true on a reasonable reading of the speaker&#x27;s words, as said in the conversation,
+  or the reason leaves out a fact that speaks for the speaker (a detention without charges, a later ruling), the
+  verdict is &quot;nitpick&quot;. A reading is about the words, not about which source to believe.
 - Estimates. A round figure for a crowd or a total that sources count differently is a &quot;nitpick&quot; when it is
-  within, or near, the range that the sources give, even if one official count is lower.
+  within, or near, the range that independent sources give. A range made only of the speaker&#x27;s own side&#x27;s figures
+  does not count.
 - Fallacies. A debatable but reasonable causal link, or an argument that mostly holds, is a &quot;nitpick&quot;.
 - Contradictions. Two statements of the same speaker that cannot both be true as said are a contradiction.
   Keep it unless the speaker himself, in the conversation, says how they fit: an exception, a change of mind,
@@ -2494,16 +2524,19 @@ CONVERSATION ({start} to {end}), each line with its minute and its speaker:
 - Severity. Rate each kept flag &quot;minor&quot;, &quot;moderate&quot; or &quot;serious&quot;; a nitpick gets null. Rate by how much the error
   changes the point, how central the claim is to what the speaker argues, and how big the error is. Never rate by
   what the speaker meant: intent does not count.
-  &quot;serious&quot; is any of these: a false figure or a false event that carries the speaker&#x27;s main argument on the topic;
-  a misleading figure that reverses the conclusion, or that is off by half or more; a ruling, a law or a record
-  stated as the opposite of what it says; a self-contradiction on the central topic of the answer; an insinuation
-  that accuses a named person of a crime with no evidence given.
-  &quot;moderate&quot;: the error weakens an argument that matters, but the conclusion still points the same way; a fallacy
-  that carries an argument of the answer.
-  &quot;minor&quot;: a side remark, a rounded or loose figure, or a weak argument that changes little.
-  Rate each flag on its own against these anchors; there is no quota for any level.
-</pre></div></div></details>
-<table class="x-check"><thead><tr><th>Placeholder</th><th>Filled with</th></tr></thead><tbody><tr><td><code>{spoken, reader}</code></td><td class="plain">the language of the video and of the reasons</td></tr><tr><td><code>{example}</code></td><td class="plain"><code>NITPICK[reader]</code>: an example nitpick reason</td></tr><tr><td><code>{flags}</code></td><td class="plain">one block per flag: id, minute, type/label, speaker, confidence, quote, reason, related, measures, note, sources</td></tr><tr><td><code>{start, end}</code></td><td class="plain">the minutes of the two-hour window</td></tr><tr><td><code>{conversation}</code></td><td class="plain">a line per speaker turn and per minute: <code>[5:00] Ana Ruiz: …</code></td></tr></tbody></table>
+  A figure is rated by how far it is from the closest credible measure, as a ratio of the larger to the smaller:
+  up to about 1.4 times (69 % said for 56 %) is &quot;minor&quot;; from about 1.4 up to 2 times (15,000 said for at most
+  8,000) is &quot;moderate&quot;; more than 2 times (one in three said for 8-10 %), or a figure that reverses the
+  conclusion, is &quot;serious&quot;. A figure said in passing is one level lower.
+  &quot;serious&quot; is also: an event that did not happen; a ruling, a law or a record stated as the opposite of what it
+  says; a self-contradiction on the central topic of the answer; an insinuation that accuses a named person of a
+  crime with no evidence given.
+  A statement about the speaker&#x27;s own conduct that a record (an agenda, the press of the time, a court) contradicts,
+  on the topic of the answer, is at least &quot;moderate&quot;; &quot;serious&quot; when the record shows the opposite of what he says.
+  &quot;moderate&quot; is also: a fallacy that carries an argument of the answer.
+  &quot;minor&quot; is also: a side remark, or a weak argument that changes little.
+  Rate each flag on its own against these anchors; there is no quota for any level.</pre></div></div></details>
+<table class="x-check"><thead><tr><th>Placeholder</th><th>Filled with</th></tr></thead><tbody><tr><td><code>{spoken, reader}</code></td><td class="plain">the language of the video and of the reasons</td></tr><tr><td><code>{example}</code></td><td class="plain"><code>NITPICK[reader]</code>: an example nitpick reason</td></tr><tr><td><code>{flags}</code></td><td class="plain">one block per flag: id, minute, type/label, speaker label, confidence, quote, reason, related, measures, note, sources</td></tr><tr><td><code>{start, end}</code></td><td class="plain">the minutes of the two-hour window</td></tr><tr><td><code>{conversation}</code></td><td class="plain">a line per speaker turn and per minute, each name replaced by a role and a number: <code>[5:00] Invitado 1: …</code></td></tr></tbody></table>
 <details class="x-more"><summary>Answer schema <span class="x-msg">src/helper/fact_checker/core/judge.py › SCHEMA</span></summary><div class="x-in"><div class="x-mock"><div class="x-bar"><span>Answer schema</span></div><pre class="x-code">{
   &quot;type&quot;: &quot;object&quot;,
   &quot;properties&quot;: {
@@ -2613,8 +2646,7 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
         <h3>Prompts</h3>
         <p class="role">The exact text of every model reading, with its placeholders and its answer schema.</p>
         <dl class="facts"><div><dt>Readings</dt><dd>7 kinds</dd></div><div><dt>Source</dt><dd>working tree, 2026-11-15</dd></div></dl>
-        <div class="questions"><h4>Open questions</h4><ul><li><code>pipeline.py</code> and <code>judge.py</code> have uncommitted changes; this tab shows them.</li></ul></div>
-      </article>
+              </article>
     </aside>
     </div>
   </section>
@@ -2624,7 +2656,7 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
     <details class="intro3">
       <summary><span class="i3-tag">What you see</span><span class="i3-sum">One consent question, and keys typed into a hidden prompt. Everything else stays on your machine.</span><span class="i3-more">How it works and why</span></summary>
       <div class="i3-grid">
-        <div class="i3"><h4>What you see</h4><p><code>fact-checker key set</code> asks for a key without echoing it; ⚙ shows whether sharing is on.</p></div>
+        <div class="i3"><h4>What you see</h4><p><code>fact-checker key set</code> or the key page asks for a key without echoing it; ⚙ shows whether sharing is on.</p></div>
         <div class="i3"><h4>What happens</h4><p>The helper listens only on 127.0.0.1, keeps quotes and keys in the helper home, and sends only what the person allowed.</p></div>
         <div class="i3"><h4>Why</h4><p>Conversations are personal data, and keys spend the person's money.</p></div>
       </div>
@@ -2644,7 +2676,7 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
       <h3>The rules in force</h3>
       <ul class="why">
         <li><b>Localhost only.</b> The helper listens on <code>127.0.0.1</code>. Only the extension's service worker calls it, never a content script.</li>
-        <li><b>Keys from a hidden prompt.</b> <code>fact-checker key set</code> writes <code>.env</code> with mode 600; <code>doctor</code> names a missing key, never its value. The Google key is restricted to the Fact Check Tools API.</li>
+        <li><b>Keys from a hidden field.</b> <code>fact-checker key set</code> or the helper's key page <code>/keys</code>, opened from ⚙ → Keys, writes <code>.env</code> with mode 600; the page answers only when Host and Origin are <code>127.0.0.1:&lt;port&gt;</code>, so another site cannot post a key; <code>doctor</code> names a missing key, never its value. The Google key is restricted to the Fact Check Tools API.</li>
         <li><b>Consent before anything leaves.</b> Nothing goes to the collector before <code>share_marks</code> is true; a mark given with sharing off never leaves.</li>
         <li><b>Nobody can plant flags.</b> A stranger's upload stays pending until the owner approves it.</li>
         <li><b>No real conversations in the repo.</b> Tests use synthetic dialogues and recorded, sanitized responses in <code>tests/fakes/</code>.</li>
@@ -2799,9 +2831,9 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
   <article data-note="SUM" hidden data-kind="compute" data-tab="tab-sharing">
     <h3>Summary</h3>
     <p class="role">Builds the profile card of each guest and the comparison card of up to three people, as a PNG with its alt text.</p>
-    <p class="explain guide">It turns a reviewed video into an image to publish: only flags marked correct count.</p>
+    <p class="explain guide">It turns a finished video into an image to publish: it counts the flags that the judge keeps, and the person's marks win over the judge.</p>
     <dl class="profile">
-      <div><dt>Code</dt><dd><code>core/summary.py</code>, <code>summary.html</code>, <code>adapters/screenshot.py</code>, <code>adapters/thumbnail.py</code></dd></div>
+      <div><dt>Code</dt><dd><code>core/summary.py</code>, <code>summary.html</code>, <code>compare.html</code>, <code>adapters/screenshot.py</code>, <code>adapters/thumbnail.py</code></dd></div>
       <div><dt>Owns</dt><dd><code>~/.fact-checker/thumbnails/</code></dd></div>
       <div><dt>On failure</dt><dd>No thumbnail: a gradient. No Chrome: no PNG.</dd></div>
       <div><dt>Decided</dt><dd>The CALVET brand, with fonts in the helper. Beat: the earlier infographic.</dd></div>
@@ -2941,7 +2973,7 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
   <article data-note="CC" hidden data-kind="external" data-tab="tab-sources">
     <h3>Claude Code</h3>
     <p class="role"><code>claude -p</code> with a JSON schema, on the person's subscription; the default provider.</p>
-    <dl class="profile"><div><dt>Contract</dt><dd>Answer in <code>structured_output</code>; web search works headless. Status: confirmed.</dd></div></dl>
+    <dl class="profile"><div><dt>Contract</dt><dd>Answer in <code>structured_output</code>; web search works headless. A 429 or an answer with no JSON is retried twice, after 30 s and 60 s. Status: confirmed.</dd></div></dl>
   </article>
   <article data-note="CX" hidden data-kind="external" data-tab="tab-sources">
     <h3>Codex CLI</h3>
@@ -2989,7 +3021,7 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
   <article data-note="WEB" data-planned="Step 2" hidden data-kind="service" data-tab="tab-target">
     <p class="kind">Planned</p>
     <h3>Web player page</h3>
-    <p class="role">An embedded player with flags beside it, that works on mobile.</p>
+    <p class="role">An embedded player with the flags beside it, each lit at its second, that works on mobile. The profile card links here.</p>
   </article>
   <article data-note="REP" data-planned="Step 2" hidden data-kind="service" data-tab="tab-target">
     <p class="kind">Planned</p>
@@ -3011,14 +3043,15 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
 <div id="tip" hidden></div>
 <dialog id="brief" aria-label="About this page">
   <h2>About this page</h2>
-  <p>The brief that this page renders, and its tab plan. /rfc reads both from here. Approved 2026-11-15.</p>
+  <p>The brief that this page renders, and its tab plan. /rfc reads both from here. Approved 2026-11-16.</p>
   <h4>Brief</h4>
   <ul>
     <li>Goal: show fact-checker as it is today, so a reader new to the project understands how a YouTube video becomes flags on the player, what each part does, where it lives in the code and why it is built this way.</li>
     <li>Audience: the person and any future contributor; no knowledge of the code assumed.</li>
-    <li>Source: <code>docs/ARCHITECTURE.md</code>, <code>docs/TARGET.md</code> and the code at <code>c64c411</code>; the prompts from the working tree on 2026-11-15.</li>
+    <li>Source: <code>docs/ARCHITECTURE.md</code>, <code>docs/TARGET.md</code> and the code at <code>41d2cd9</code>, the prompts included.</li>
     <li>Not on the page: specs, tasks, session costs, Step 2 and 3 beyond the Target tab.</li>
-    <li>Open questions: ARCHITECTURE still marks S5–S39 as proposed although the code exists (run <code>/rfc sync</code>); ARCHITECTURE names <code>src/texts.ts</code>, the file is <code>src/extension/src/texts.ts</code>.</li>
+    <li>Decisions: those of <code>docs/ARCHITECTURE.md</code>, among them that a figure from the speaker's own side never backs the speaker alone, and that the judge rules on the reading, blind to names.</li>
+    <li>Open questions: none.</li>
   </ul>
   <details><summary>Tab plan</summary>
     <table>
@@ -3026,17 +3059,17 @@ CONTEXT[&#x27;en&#x27;] = &#x27;Secretary of Transportation of the United States
       <tbody>
         <tr><td>Overview</td><td>map</td><td>changed</td></tr>
         <tr><td>Target</td><td>map</td><td>changed</td></tr>
-        <tr><td>One video</td><td>flow</td><td>changed</td></tr>
+        <tr><td>One video</td><td>flow</td><td>same</td></tr>
         <tr><td>Extension</td><td>component</td><td>changed</td></tr>
         <tr><td>Helper, CLI and install</td><td>component</td><td>changed</td></tr>
         <tr><td>Pipeline</td><td>component</td><td>changed</td></tr>
         <tr><td>Sources and readers</td><td>component</td><td>changed</td></tr>
-        <tr><td>Quality</td><td>component</td><td>changed</td></tr>
+        <tr><td>Quality</td><td>component</td><td>same</td></tr>
         <tr><td>Sharing and summary</td><td>component</td><td>changed</td></tr>
         <tr><td>Data and contracts</td><td>shared</td><td>changed</td></tr>
         <tr><td>Prompts</td><td>shared</td><td>changed</td></tr>
         <tr><td>Security and privacy</td><td>shared</td><td>changed</td></tr>
-        <tr><td>Glossary</td><td>reference</td><td>changed</td></tr>
+        <tr><td>Glossary</td><td>reference</td><td>same</td></tr>
       </tbody>
     </table>
   </details>
