@@ -1,27 +1,26 @@
-"""S35 A1 · The card counts one guest's reviewed claims
+"""S35 A1 · The card counts what the judge keeps for one guest
 
-Story: The person reviews an invented interview where Ana Ruiz makes 26 checked claims and 4 false or misleading flags,
-all marked correct, and 2 puntualizaciones of the judge that the person leaves unmarked; 2 of the 4 are serious; she
+Story: The person exports an invented interview where Ana Ruiz makes 26 checked claims; the judge keeps 4 false or
+misleading flags and rules 2 puntualizaciones, none of them marked by the person; 2 of the 4 are serious; she
 uses "Falso dilema" three times and dodges 2 of the 11 questions put to her. The card reads "4 de 26 datos, falsos o
-engañosos", lists 2 serious, "Falso dilema ×3" and "Esquivó 2 de 11 preguntas", and shows the two serious claims, each
+engañosos", lists 2 serious among all her kept flags, "Falso dilema ×3" and "Esquivó 2 de 11 preguntas", and shows the two serious claims, each
 with its correction and the name of its source.
-Edge case: WHEN a flag is not marked or marked unfair THEN it counts nowhere on the card, as on the image today; an
-unmarked puntualización is the one exception and counts as a puntualización.
+Edge case: WHEN the person marks a flag unfair THEN it counts nowhere on the card, even if the judge kept it.
 Edge case: WHEN the person marks a puntualización correct THEN the mark wins, as on the player: it counts under its found
 verdict, such as false.
 
 Setup: a temporary helper home with the S35 invented interview (s35_fakes.INTERVIEW) and its marks in the store: 4 false
 or misleading flags of Ana Ruiz (2 serious, 1 moderate, 1 minor), 3 "Falso dilema", 1 "Ad hominem" and 2 dodged
-questions, all marked correct; 2 puntualizaciones of the judge (a false and a misleading figure) with no mark; a serious
-false figure marked unfair; a "Falso dilema", a dodged question and a serious misleading figure with no mark; a host
-fallacy marked correct. The helper's HTTP server runs on a free local port with the screenshot faked to return the
+questions, all kept by the judge and not marked; 2 puntualizaciones of the judge (a false and a misleading figure) with
+no mark; a serious false figure, a "Falso dilema", a dodged question and a serious misleading figure, kept by the judge
+and marked unfair; a host fallacy. The helper's HTTP server runs on a free local port with the screenshot faked to return the
 card's HTML: `summary.png?person=` gives the card, `summary.txt?person=` its alt text. The second edge case marks the
 false puntualización correct in another helper home.
 """
 from urllib.parse import quote
 
 from s35_fakes import GUEST, HOST_FLAG, INTERVIEW, MARKS, NITPICKS, SERIOUS_FALSE, SERIOUS_MISLEADING, UNFAIR, \
-    UNMARKED, VIDEO, flag, get, save_with_marks, start, visible
+    REJECTED, VIDEO, flag, get, save_with_marks, start, visible
 
 
 def test_card_content(tmp_path, monkeypatch):
@@ -41,8 +40,8 @@ def test_card_content(tmp_path, monkeypatch):
     for want in ("2 falsos", "2 engañosos", "2 puntualiz", "20 correctos"):
         assert want in card, f"FAIL S35 A1 · the verdict bar lacks {want!r}: {card!r}"
 
-    # Case 3 · counts by severity of the false or misleading ones → Grave 2, Moderado 1, Leve 1
-    for want in ("Grave 2", "Moderado 1", "Leve 1"):
+    # Case 3 · counts by severity of every kept flag but questions (figures and rhetoric) → Grave 2, Moderado 4, Leve 2
+    for want in ("Grave 2", "Moderado 4", "Leve 2"):
         assert want in card, f"FAIL S35 A1 · the severity block lacks {want!r}: {card!r}"
 
     # Case 4 · the devices she repeats and the questions she dodged → "Falso dilema ×3", "Esquivó 2 de 11 preguntas"
@@ -57,16 +56,16 @@ def test_card_content(tmp_path, monkeypatch):
     assert card.index(SERIOUS_FALSE["quote"]) < card.index(SERIOUS_MISLEADING["quote"]), \
         "FAIL S35 A1 · the serious misleading figure comes before the serious false one"
 
-    # Case 6 · an unfair or unmarked flag, or the host's → nowhere on the card or in its alt text
-    for f in [UNFAIR, *UNMARKED, HOST_FLAG]:
+    # Case 6 · a flag marked unfair, or the host's → nowhere on the card or in its alt text
+    for f in [UNFAIR, *REJECTED, HOST_FLAG]:
         assert f["quote"] not in card and f["quote"] not in alt, f"FAIL S35 A1 · {f['id']} shows on the card"
-    assert "Falso dilema ×4" not in card and "Esquivó 3" not in card, "FAIL S35 A1 · an unmarked flag is counted"
+    assert "Falso dilema ×4" not in card and "Esquivó 3" not in card, "FAIL S35 A1 · a flag marked unfair is counted"
 
     # Case 7 · the alt text → the same numbers and both serious quotes, within 1000 characters
     for want in ("Ana Ruiz", "4 de 26", "Falso dilema ×3", "2 de 11", SERIOUS_FALSE["quote"], SERIOUS_MISLEADING["quote"]):
         assert want in alt, f"FAIL S35 A1 · the alt text lacks {want!r}: {alt!r}"
     assert len(alt) <= 1000, f"FAIL S35 A1 · the alt text has {len(alt)} characters"
-    print("PASS S35 A1 · The card counts one guest's reviewed claims")
+    print("PASS S35 A1 · The card counts what the judge keeps for one guest")
 
 
 def test_marked_puntualizacion(tmp_path, monkeypatch):

@@ -1,9 +1,9 @@
 """The invented interview that the S35 tests share, and the helpers that serve it.
 
 INTERVIEW is a flag file as the helper keeps it: the host "Presentador" and the guest "Ana Ruiz (invitada)" (person
-"Ana Ruiz"), 26 checked claims and 11 questions put to Ana Ruiz. MARKS gives the verdict the person gave each flag;
-a flag missing from MARKS has no mark, such as the judge's two puntualizaciones (NITPICKS). Every name, quote and
-figure is invented.
+"Ana Ruiz"), 26 checked claims and 11 questions put to Ana Ruiz. The card counts what the judge keeps, with no review:
+the flags in CORRECT have no mark. MARKS gives the verdict the person gave a flag: the ones in REJECTED and UNFAIR are
+marked unfair. The judge's two puntualizaciones (NITPICKS) have no mark. Every name, quote and figure is invented.
 """
 import re
 import threading
@@ -33,7 +33,7 @@ SERIOUS_MISLEADING = flag(2460.0, GUEST, "inaccuracy", "misleading", "hemos hech
                           reason="Cuenta las iniciadas; en terminadas es tercera de cinco.")
 UNFAIR = flag(2600.0, GUEST, "inaccuracy", "false", "la sanidad recibe el doble que hace diez años",
               severity="serious", source="Hacienda")
-UNMARKED = [flag(2700.0, GUEST, "fallacy", "false_dilemma", "o nosotros o el caos de siempre"),
+REJECTED = [flag(2700.0, GUEST, "fallacy", "false_dilemma", "o nosotros o el caos de siempre"),
             flag(2800.0, GUEST, "question", "dodged", "eso ya lo explicaremos en su momento"),
             flag(3000.0, GUEST, "inaccuracy", "misleading", "somos la región que más crece de toda Europa",
                  severity="serious", source="Eurostat")]
@@ -59,8 +59,8 @@ CORRECT = [
     flag(1700.0, GUEST, "question", "dodged", "esa pregunta habría que hacérsela a otros", severity="minor"),
     HOST_FLAG,
 ]
-FLAGS = sorted(CORRECT + NITPICKS + [UNFAIR] + UNMARKED, key=lambda f: f["t"])
-MARKS = {f["id"]: "correct" for f in CORRECT} | {UNFAIR["id"]: "unfair"}
+FLAGS = sorted(CORRECT + NITPICKS + [UNFAIR] + REJECTED, key=lambda f: f["t"])
+MARKS = {f["id"]: "unfair" for f in [UNFAIR, *REJECTED]}
 
 INTERVIEW = {
     "video_id": VIDEO, "published_at": "2026-11-12", "status": "done", "stop_reason": None, "lang": "es",

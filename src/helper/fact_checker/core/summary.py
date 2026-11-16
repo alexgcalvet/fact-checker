@@ -22,13 +22,13 @@ TEXTS = {
         "severity": "Gravedad", "levels": {"serious": ("Grave", "grave", "graves"),
                                            "moderate": ("Moderado", "moderado", "moderados"),
                                            "minor": ("Leve", "leve", "leves")},
-        "devices": "Lo que más repite", "no_devices": "Nada",
-        "dodged": ("Esquivó <b>{} de {}</b> pregunta", "Esquivó <b>{} de {}</b> preguntas"),
-        "gravest": "Lo más grave", "no_gravest": "Ningún dato falso o engañoso revisado",
+        "devices": "Retórica y falacias", "no_devices": "Nada",
+        "dodged": ("Esquivó <b>{} de {}</b> preguntas", "Esquivó <b>{}</b> y respondió a medias <b>{}</b> de {} preguntas"),
+        "gravest": "Lo más grave", "no_gravest": "Nada grave",
         "verdict": {"false": "Falso", "misleading": "Engañoso"},
-        "footer": "Detectado con IA · <b>revisado a mano</b> · fuentes en el enlace",
-        "alt": "Ficha de {} en «{}»{}.", "alt_hook": "{} de {} datos, falsos o engañosos", "alt_devices": "Repite",
-        "alt_footer": "Detectado con IA, revisado a mano.",
+        "footer": "Detectado con IA · <b>no revisado por humanos</b> · fuentes en el enlace",
+        "alt": "Ficha de {} en «{}»{}.", "alt_hook": "{} de {} datos, falsos o engañosos", "alt_devices": "Retórica y falacias",
+        "alt_footer": "Detectado con IA, no revisado por humanos.",
         "labels": {"ad_hominem": "Ad hominem", "tu_quoque": "Y tú más", "false_dilemma": "Falso dilema",
                    "straw_man": "Hombre de paja", "false_cause": "Causa falsa",
                    "hasty_generalization": "Generalización apresurada", "vague_authority": "Autoridad vaga",
@@ -45,13 +45,13 @@ TEXTS = {
         "severity": "Severity", "levels": {"serious": ("Serious", "serious", "serious"),
                                            "moderate": ("Moderate", "moderate", "moderate"),
                                            "minor": ("Minor", "minor", "minor")},
-        "devices": "Repeats most", "no_devices": "Nothing",
-        "dodged": ("Dodged <b>{} of {}</b> question", "Dodged <b>{} of {}</b> questions"),
-        "gravest": "Most serious", "no_gravest": "No reviewed false or misleading claim",
+        "devices": "Rhetoric and fallacies", "no_devices": "Nothing",
+        "dodged": ("Dodged <b>{} of {}</b> questions", "Dodged <b>{}</b> and half-answered <b>{}</b> of {} questions"),
+        "gravest": "Most serious", "no_gravest": "Nothing serious",
         "verdict": {"false": "False", "misleading": "Misleading"},
-        "footer": "Detected with AI · <b>reviewed by hand</b> · sources at the link",
-        "alt": "Profile of {} in «{}»{}.", "alt_hook": "{} of {} claims, false or misleading", "alt_devices": "Repeats",
-        "alt_footer": "Detected with AI, reviewed by hand.",
+        "footer": "Detected with AI · <b>not reviewed by a person</b> · sources at the link",
+        "alt": "Profile of {} in «{}»{}.", "alt_hook": "{} of {} claims, false or misleading", "alt_devices": "Rhetoric and fallacies",
+        "alt_footer": "Detected with AI, not reviewed by a person.",
         "labels": {"ad_hominem": "Ad hominem", "tu_quoque": "Whataboutism", "false_dilemma": "False dilemma",
                    "straw_man": "Straw man", "false_cause": "False cause",
                    "hasty_generalization": "Hasty generalization", "vague_authority": "Vague authority",
@@ -100,30 +100,45 @@ def _source(flag: dict) -> str:
 
 
 def card(data: dict, name: str, series: str | None = None) -> dict:
-    """The content of the card of `name` from the flag file with marks. The mark wins, as on the player: a flag
-    marked correct counts under its found verdict, whatever the judge ruled, and one marked unfair counts nowhere. A
-    puntualización is a figure the judge ruled a nitpick and the person did not mark. The counts of checked claims and
-    questions asked come from the file's `claims` and `questions`."""
+    """The content of the card of `name` from the flag file with marks. The card counts what the judge keeps, with no
+    review needed (its footer says so); a flag the judge has not ruled on counts too. The mark wins, as on the
+    player: a flag marked correct counts under its found verdict, whatever the judge ruled, and one marked unfair
+    counts nowhere. A puntualización is a figure the judge ruled a nitpick and the person did not mark. The counts of
+    checked claims and questions asked come from the file's `claims` and `questions`."""
     lang = data.get("lang") or "es"
     words = TEXTS[lang]
     mine = [f for f in data["flags"] if speaker(f) == name]
-    kept = [f for f in mine if f.get("mark") == "correct"]
+    kept = [f for f in mine if f.get("mark") == "correct"
+            or "mark" not in f and (f.get("judge") or {}).get("verdict", "keep") == "keep"]
     wrong = [f for f in kept if f["type"] == "inaccuracy" and f["label"] in WRONG]
     small = [f for f in mine if "mark" not in f and f["type"] == "inaccuracy"
              and (f.get("judge") or {}).get("verdict") == "nitpick"]
     level = lambda f: (f.get("judge") or {}).get("severity")
     # An analysis from before the counts has none: the reviewed flags are then the least that was checked.
     checked = max((data.get("claims") or {}).get(name, 0), len(wrong) + len(small))
-    dodged = sum(f["type"] == "question" for f in kept)
+    dodged = sum(f["type"] == "question" and f["label"] == "dodged" for f in kept)
+    partial = sum(f["type"] == "question" and f["label"] == "partial" for f in kept)
     kinds = Counter(WRONG[f["label"]] for f in wrong)
+    # Severity covers every kept flag but questions; the gravest put false figures before misleading ones, then
+    # rhetoric, at each level.
+    rated = [f for f in kept if f["type"] == "inaccuracy" and f["label"] in WRONG or f["type"] in DEVICES]
+    kind = lambda f: WRONG[f["label"]] if f["type"] == "inaccuracy" else "rhetoric"
+    devices, grave = Counter(), Counter()
+    for f in kept:
+        if f["type"] in DEVICES:
+            label = words["labels"].get(f["label"]) or words["labels"].get(f.get("closest") or "", f["label"])
+            devices[label] += 1
+            grave[label] += level(f) == "serious"
     person = (data.get("people") or {}).get(name, {})
     spoken, duration = person.get("spoken_s"), data.get("duration")
-    gravest = sorted(wrong, key=lambda f: (SEVERITIES.index(level(f)) if level(f) in SEVERITIES else 3,
-                                           WRONG[f["label"]] != "false", -f["confidence"], f["t"]))[:2]
+    gravest = sorted([f for f in rated if f in wrong or level(f) == "serious"],
+                     key=lambda f: (SEVERITIES.index(level(f)) if level(f) in SEVERITIES else 3,
+                                    ("false", "misleading", "rhetoric").index(kind(f)), -f["confidence"], f["t"]))[:2]
     return {
         "lang": lang,
         "name": person.get("person") or re.sub(r"\s*\(.*\)$", "", name),
-        "title": data.get("title") or data["video_id"],
+        # The programme, not the whole YouTube title: "The Wild Project #392 - Name | topics" → "The Wild Project #392".
+        "title": re.split(r" [-|–—] ", data.get("title") or "")[0] or data["video_id"],
         "date": _date(data["published_at"], words) if data.get("published_at") else "",
         "length": words["speaking"].format(_length(spoken), _length(duration)) if spoken and duration
         else _length(duration) if duration else "",
@@ -132,20 +147,31 @@ def card(data: dict, name: str, series: str | None = None) -> dict:
         "checked": checked,
         "verdicts": {"false": kinds["false"], "misleading": kinds["misleading"], "nitpick": len(small),
                      "correct": checked - len(wrong) - len(small)},
-        "severity": {s: sum(level(f) == s for f in wrong) for s in SEVERITIES},
-        "devices": Counter(words["labels"].get(f["label"], f["label"]) for f in kept
-                           if f["type"] in DEVICES).most_common(3),
+        "severity": {s: sum(level(f) == s for f in rated) for s in SEVERITIES},
+        # Ties go to the device with a serious flag.
+        "devices": sorted(devices.items(), key=lambda x: (-x[1], -grave[x[0]]))[:3],
         "dodged": dodged,
-        "asked": max((data.get("questions") or {}).get(name, 0), dodged),
-        "gravest": [{"t": f["t"], "quote": f["quote"], "kind": WRONG[f["label"]], "severity": level(f),
-                     "correction": f["reason"], "source": _source(f)} for f in gravest],
+        "partial": partial,
+        "asked": max((data.get("questions") or {}).get(name, 0), dodged + partial),
+        "gravest": [{"t": f["t"], "quote": f["quote"], "kind": kind(f),
+                     "label": words["labels"].get(f["label"], f["label"]), "severity": level(f),
+                     "correction": (f.get("judge") or {}).get("reason") or f["reason"] if kind(f) == "rhetoric"
+                     else f["reason"], "source": _source(f)} for f in gravest],
     }
 
 
 def _verdict(item: dict, words: dict) -> str:
     """ "Falso, grave." """
     severity = item["severity"] in SEVERITIES and words["levels"][item["severity"]][1]
-    return f"{words['verdict'][item['kind']]}{', ' + severity if severity else ''}."
+    name = item["label"] if item["kind"] == "rhetoric" else words["verdict"][item["kind"]]
+    return f"{name}{', ' + severity if severity else ''}."
+
+
+def _dodged(c: dict, words: dict) -> str:
+    """ "Esquivó 2 de 11 preguntas", or with half answers "Esquivó 10 y respondió a medias 10 de 49 preguntas"."""
+    if c["partial"]:
+        return words["dodged"][1].format(c["dodged"], c["partial"], c["asked"])
+    return words["dodged"][0].format(c["dodged"], c["asked"])
 
 
 def alt_text(c: dict) -> str:
@@ -163,7 +189,7 @@ def alt_text(c: dict) -> str:
         head.append(f"{words['severity']}: {severity}.")
     if c["devices"]:
         head.append(f"{words['alt_devices']}: {', '.join(f'{label} ×{n}' for label, n in c['devices'])}.")
-    head.append(re.sub(r"</?b>", "", plural(c["asked"], words["dodged"]).format(c["dodged"], c["asked"])) + ".")
+    head.append(re.sub(r"</?b>", "", _dodged(c, words)) + ".")
     tail = [words["alt_footer"]]
     room = 1000 - len(" ".join(head + tail)) - 2
     items = [f"{minute(g['t'])} «{g['quote']}» {_verdict(g, words)} {g['correction']}"
@@ -183,7 +209,7 @@ def _fonts() -> str:
 
 
 LOOKS = {"false": ("fa", "fa", "--red"), "misleading": ("en", "en", "--amber"), "nitpick": ("en", "pu", "--grey"),
-         "correct": ("ok", "ok", "--green")}
+         "correct": ("ok", "ok", "--green"), "rhetoric": ("re", "re", "--mag")}
 ORDER = ("false", "misleading", "nitpick", "correct")  # the verdict bar, false first
 
 
@@ -206,13 +232,13 @@ def page(c: dict, template: str, image: str | None = None) -> str:
     gravest = "".join(
         f'<div class="item"><div class="q">{_icon(LOOKS[g["kind"]][0], LOOKS[g["kind"]][1])}'
         f'<span class="quote">«{escape(cut(g["quote"], 60))}»</span><span class="min num">{minute(g["t"])}</span></div>'
-        f'<div class="fix"><b class="c-{g["kind"]}">{escape(_verdict(g, words))}</b> {escape(cut(g["correction"], 110))}'
+        f'<div class="fix"><b class="c-{g["kind"]}">{escape(_verdict(g, words))}</b> {escape(cut(g["correction"], 92))}'
         + (f' <span class="src">{escape(cut(g["source"], 30))}</span>' if g["source"] else "") + '</div></div>'
         for g in c["gravest"]) or f'<div class="item muted">{words["no_gravest"]}</div>'
     plate = (f'<img class="p-dim" src="{image}" alt=""><div class="band"><img src="{image}" alt=""></div>'
              if image else '<div class="p-none"></div>')
     sub = " · ".join(x for x in (f"«{escape(cut(c['title'], 40))}»", escape(c["length"])) if x)
-    dodged = words["dodged"][0 if c["asked"] == 1 else 1].format(c["dodged"], c["asked"])
+    dodged = _dodged(c, words)
     return Template(template).substitute(
         lang=c["lang"], fonts=_fonts(), wordmark=(FONTS / "calvet-wordmark.svg").read_text(), plate=plate,
         kicker=escape(" · ".join(x for x in (words["kicker"], c["date"]) if x)),
