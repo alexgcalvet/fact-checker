@@ -132,8 +132,10 @@ def test_judge_verdicts(tmp_path):
     prompt = calls[0]["prompt"]
     for _, _, text in LINES:
         assert text in prompt, text
-    assert re.search(rf"5:00\W+Ana Ruiz\W+{FALSE}", prompt), "no speaker and minute on the 5:00 line"
-    assert re.search(rf"9:50\W+Luis\W+Muchas gracias", prompt), "no speaker and minute on the 9:50 line"
+    # The judge reads blind (2026-11-16): each speaker as a label with no name, such as "Speaker 2".
+    assert re.search(rf"5:00\W+Speaker \d+\W+{FALSE}", prompt), "no speaker and minute on the 5:00 line"
+    assert "Ana Ruiz" not in prompt.split("CONVERSATION")[-1], "the judge reads the guest's name"
+    assert re.search(rf"9:50\W+Speaker \d+\W+Muchas gracias", prompt), "no speaker and minute on the 9:50 line"
     for id in IDS.values():
         assert id in prompt, id
     context = [f for f in data["flags"] if f["type"] == "context"]
