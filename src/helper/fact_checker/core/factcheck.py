@@ -231,6 +231,7 @@ SEARCH_SCHEMA = {
 }
 
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+WEB = ("https://", "http://")  # a source link the player opens; a model can be led to write `javascript:`
 
 
 def _claims_text(claims: list[Claim], published: dict[str, list[PublishedCheck]],
@@ -316,7 +317,7 @@ def check_claims(claims: list[Claim], published_at: str | None,
         other_event = {p["url"] for p in v.get("published", []) if not p["same_event"]}
         sources = []
         for s in v["sources"]:
-            if s["url"] in other_event or (cited is not None and s["url"] not in cited):
+            if s["url"] in other_event or (cited is not None and s["url"] not in cited) or not s["url"].startswith(WEB):
                 continue
             date = (s.get("date") or found.get(s["url"]) or review_dates.get(s["url"]) or "")[:10]
             if DATE.fullmatch(date):
@@ -339,7 +340,8 @@ def check_claims(claims: list[Claim], published_at: str | None,
 def _record_flag(claim: Claim, v: dict, sources: list[dict]) -> Flag | None:
     """A contradiction with the speaker's dated record or a broken promise, else None."""
     earlier, promise = v.get("earlier"), v.get("promise")
-    if earlier and v["verdict"] in WRONG and DATE.fullmatch((earlier["date"] or "")[:10]):
+    if earlier and v["verdict"] in WRONG and DATE.fullmatch((earlier["date"] or "")[:10]) \
+            and earlier["url"].startswith(WEB):
         source = {"publisher": earlier["publisher"], "url": earlier["url"]}
         date = earlier["date"][:10]
         return Flag(t=claim.t, speaker=claim.speaker, quote=claim.quote, type="contradiction", label="record",

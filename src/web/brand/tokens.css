@@ -1,0 +1,398 @@
+/* CALVET · ONE token file, pass f7 (2026-11-21): POLISH ONLY (spec.md §18).
+   f7 changes: gold yields to amber (--kpi-featured-*), one chart default state (--ch-tip-*), per-painting saturation in the
+   rest grade (--sat; La novena ola graded on every surface), empty cover state (--cover-empty-*), the sixth verdict
+   Evasiva drawn (--st-evasiva-* full set, verdict order with Evasiva 4th), label clearance (--label-clear, --text-edge).
+   ── f6 header ──
+   pass f6 (2026-11-21): PANEL DECISIONS + ONE CHART RULEBOOK.
+   f6 changes (spec.md §17): wordmark key 'D10' on every board; ONE amber (--ch-1 = --amber #D99A2B on night);
+   Musgo lifted, Acero turned away from the lens blue, delta-down moved off Falso; comparison = bone dashed;
+   one point under the V (f6/vpoint.js). Everything else is f5 unchanged.
+   ── f5 header ──
+   pass f5 (2026-11-21): CHARTS WITH A COLOUR CODE + short fix pass.
+   Base: sketches/f4/tokens.css. f5 adds, from the owner (2026-11-21): a categorical chart palette with clearly distinct
+   hues (validated, fixed order), a DELTA pair for up / down in KPIs and tables (never a verdict colour), the HIGHLIGHT
+   rule for explanatory charts (headline key words in the key-series amber), chart anatomy, one played-audio rule,
+   one "Sonando" component and a heavier point under the V. Everything else is f4 unchanged (spec.md §14, §15).
+   Every board, web page and app screen uses these names; nobody invents a value. Owner verdicts override this file.
+   MOTION and SOUND are PARKED: the owner designs them himself, at the end. The motion block below is kept
+   unchanged only so old files still resolve; do not tune it. */
+
+:root {
+  /* ── GROUND ─────────────────────────────────────────────────────────────
+     The world is black. Web, pieces, video, app home, editor and Galería sit on --ground.
+     The night ramp is only for data surfaces without an image. Nearer the light = lighter step. */
+  --ground: #000000;
+  --n0: #05070B;   /* well: player, captions */
+  --n1: #07090D;   /* page of a data screen (dashboard, tables) */
+  --n2: #0B0F16;   /* sidebar column (opaque fallback) */
+  --n3: #0E1015;   /* card, chart surface, table body, composer */
+  --n4: #14161C;   /* menu, popover, avatar */
+  --n5: #1A1D24;   /* tooltip, the highest step */
+  --veil: #0A0E15; /* last-resort veil behind a title on art, never a band */
+
+  /* ── MATERIALS ──────────────────────────────────────────────────────────
+     Bone carries titles and CALVET. Gold = ONE point per screen, always with its figure. */
+  --bone: #E6DCC4;        /* titles, wordmark, the one primary button */
+  --bone-ink: #16130F;    /* text on bone */
+  --bone-hover: #F0E7D2;
+  --focus: #DAD0B8;       /* focus ring */
+  --gold: #F2D9A6;        /* the one key datum per screen */
+  --gold-glow: #D8A84E;   /* its halo only */
+  --gold-halo: 0 0 18px rgba(216,168,78,.35); /* f4: text-shadow of the one gold KPI so it reads as gold, not bone */
+  /* f7 · GOLD YIELDS TO AMBER (owner, spec §18.3). The featured KPI is BONE by default. It turns gold only on a screen
+     with NO amber at all (no beat / playhead knob / EN VIVO, no key series or --ch-hi, no headline box, no Engañoso or
+     error ring). One amber mark anywhere on the screen = the featured KPI stays bone, no halo. */
+  --kpi-featured: var(--t1);          /* default: bone */
+  --kpi-featured-halo: none;
+  --kpi-featured-gold: var(--gold);   /* only when the screen holds no amber */
+  --kpi-featured-gold-halo: var(--gold-halo);
+  --warm: #FFF0D6;        /* lit edge of glass, 1 px, peak 75 % */
+  --oxide: #B4483A;       /* the red of his column. ONLY the Falso verdict, ALWAYS with its filled disc + word */
+
+  /* ── THE AMBER RULE · FINAL (owner adopted 2026-11-21, from f3/Ambar.png) ──
+     One hue, two shapes, never confused:
+     FILLED amber = the beat / active: playhead knob, LEYENDO / Verificando, EN VIVO,
+                    the end point of a video, and the ONE highlight of a chart (max one per chart).
+                    f5: played audio is BONE (--bar-played), not amber.
+     RING amber   = look at this: the Engañoso verdict and EVERY system error / alert / review.
+                    Always a 1.5 px ring + "!" glyph + word. Never filled, never a line, a bar or a fill area.
+     Screen cap: max ONE moving filled thing + ONE chart highlight per screen.
+     f6 · A CHART CARD IS ITS OWN AMBER ZONE: its key series + headline boxes are counted apart from the screen's
+     beat / Engañoso. An Engañoso chip never sits inside the chart frame or on its headline (>= 24 px or a hairline).
+     NOT amber, ever: count badges (Avisos 3 = t1 mono), export / job progress bars (bone), decoration,
+     the waterline beads, legend glyphs of pending items, verdict numbers without their mark. */
+  --df-window-hi: #F6CF7E;          /* DeFacto: the top of the large mark's lit window, which fades down to --amber */
+  --amber: #D99A2B;                 /* f6: THE ONE AMBER on night. Beat, playhead, Engañoso ring, key chart series and
+                                       headline boxes all resolve here (--ch-1 aliases it; #C48725 is retired).
+                                       Bone paper has ONE amber step too: #A86F12 (--ch-1-bone = --st-enganoso-bone). */
+  --beat: var(--amber);             /* filled marks only */
+  --beat-text: #F0BE6A;             /* "EN VIVO", "LEYENDO", the beat label */
+  --warn-ring: var(--amber);        /* stroke only: 1.5 px at 8–16 px, 2 px at >= 24 px */
+  --warn-ring-w: 1.5px;
+  --warn-text: #F0BE6A;             /* the word "Engañoso", "Error de audio" */
+  --bar-rest: rgba(230,220,196,.42);/* audio bars not played yet */
+  --bar-played: var(--t1);          /* f5 ONE PLAYED-AUDIO RULE: played bars are BONE everywhere (web, app, editor,
+                                       pieces, Fundamentos, Ambar). Amber only on the playhead knob and on EN VIVO. */
+  --playhead: var(--beat);          /* f5: the knob / playhead, the only filled amber of a player */
+  --live-text: var(--beat-text);    /* f5: "EN VIVO" (a live stream), the only amber word of a player */
+  --progress-track: rgba(230,220,196,.22); /* f4: job / export / upload progress track */
+  --progress-fill: var(--t1);              /* f4: job progress is bone, never amber (it is work, not the beat) */
+  --count: var(--t1);                      /* f4: count badges (Avisos 3), mono 12, never amber, never a ring */
+
+  /* ── LENS BLUE (his glasses) = SEALED / YOURS ───────────────────────────
+     Correcto, Sellado, the key, local copy, "no rastrea". One lens object per screen outside verdict lists.
+     Never a link, focus, chart series, button fill, background, cover or piece. Never within 48 px of gold or beat. */
+  --lens-0: #263E52;   /* sealed chip fill at 70 %, privacy toggle track */
+  --lens-1: #35586E;   /* hairline of a sealed object; Correcto on bone */
+  --lens-2: #657E8D;   /* the mark: seal, key glyph */
+  --lens-3: #D9DFE3;   /* text or knob on lens-0 */
+  --lens-text: #8FA3B0;
+  --lens-fade: linear-gradient(180deg, #263E52 0%, #35586E 38%, #657E8D 72%, rgba(217,223,227,0) 100%);
+  --lens-edge: linear-gradient(90deg, transparent, rgba(101,126,141,.85) 40%, transparent);
+
+  /* ── TEXT (one ramp for web and app; AA on #000 and every night step) ──
+     t1 11.9:1 · t2 7.2:1 · t3 5.3:1 · t4 3.1:1 = disabled / placeholder / decorative only, never information. */
+  --t1: rgba(230,220,196,.92);
+  --t2: rgba(230,220,196,.70);
+  --t3: rgba(230,220,196,.58);
+  --t4: rgba(230,220,196,.40);
+  --ink1: rgba(22,19,15,.92);   /* on bone paper */
+  --ink2: rgba(22,19,15,.72);
+  --ink3: rgba(22,19,15,.64);
+
+  /* ── STATUS / VERDICT CODE (owner option A) ─────────────────────────────
+     Colour + SHAPE + WORD, always. Fixed order: Falso · Engañoso · Retórica · Contexto · Correcto.
+     Reserved: never decoration, never a chart series, never a button fill.
+     A bare verdict number (table cell, count) is t1/t2: it takes a verdict colour only beside its own mark. */
+  --st-falso: var(--oxide);   --st-falso-text: #E39A8C;   /* filled disc, glyph × */
+  --st-enganoso: var(--warn-ring); --st-enganoso-text: var(--warn-text); /* RING, glyph ! (never filled) */
+  --st-retorica: var(--bone); --st-retorica-text: var(--t1); /* hollow diamond, glyph ~ */
+  --st-contexto: #A8ACB3;     --st-contexto-text: #BEC1C6; /* filled rounded square, glyph i */
+  --st-correcto: var(--lens-2); --st-correcto-text: var(--lens-text); /* seal: disc in a ring, glyph ✓ */
+  --st-glyph: #000000;
+  --st-error: var(--warn-ring); --st-error-text: var(--warn-text); /* system error = the amber ring, NEVER oxide */
+  --st-falso-bone: #9A3A2D; --st-enganoso-bone: #A86F12; --st-enganoso-bone-text: #7E520A;
+  /* Evasiva (owner's fact-checker, 2026-11-21): a dodged or half-answered question. Half-filled disc (left half filled,
+     right half 1.5 px outline), glyph ?. Dusty lilac, used nowhere else. Order: Falso · Engañoso · Retórica · Evasiva · Contexto · Correcto. */
+  --st-evasiva: #A08FC0; --st-evasiva-text: #C6BADB; --st-evasiva-bone: #6B5A8C;
+  /* f7: Evasiva drawn (spec §18.6). Night mark 7.2:1 on --ground, 6.5:1 on --n3; text 10.4:1 on --n3. Glyph "?" two-tone: --st-glyph (#000) over
+     the filled left half, --st-evasiva over the open right half. Bone: mark #6B5A8C (4.4:1, non-text), glyph left = --bone,
+     text --st-evasiva-bone-text #5F4E85 (5.3:1 on bone). Never a series, never in a plot, never a fill colour elsewhere. */
+  --st-evasiva-bone-text: #5F4E85;
+  --st-evasiva-stroke: 1.5px;           /* the open right half, at 8, 10 and 16 px */
+  --verdict-order: "falso enganoso retorica evasiva contexto correcto"; /* f7: six, Evasiva 4th (data.json meta.verdicts) */
+  --st-retorica-bone: #2E2920; --st-contexto-bone: #777B82; --st-contexto-bone-text: #5E6268; --st-correcto-bone: #35586E;
+  --st-mark: 8px;       /* list, table, legend, counts */
+  --st-mark-lane: 10px; /* over video / timeline lane, with a 2 px night halo (f4: was 6–8 px on Ambar, too small) */
+  --st-icon: 16px;      /* icon with glyph */
+  --st-chip: 28px;      /* chip height */
+
+  /* ── WORK STATES: neutral line glyphs, never a verdict shape ────────────
+     Publicado (arrow up off a floor) · Borrador (dashed page) · Programado (clock) · Exportando (arrow down
+     into a tray + mono %) · Sellado (the key, lens blue: the only coloured work state). 16 px, 1.5 px stroke, no fill. */
+  --ws-ink: var(--t2);
+  --ws-sealed: var(--lens-2);
+  --ws-stroke: 1.5px;
+
+  /* ── TYPE ───────────────────────────────────────────────────────────────
+     The work speaks in Newsreader, the tool in Host Grotesk, the measure in mono. CALVET is drawn SVG. */
+  --font-work: 'Newsreader', Georgia, serif;
+  --font-tool: 'Host Grotesk', system-ui, sans-serif;
+  --font-measure: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --fs-display: clamp(64px, 9vw, 160px); /* title over art, Newsreader 400 */
+  --fs-section: 48px;   /* web section, Host 400 */
+  --fs-hero: 40px;      /* the one question on the app home, Newsreader 400 */
+  --fs-project: 36px;   /* f4: project title over the app world strip, Newsreader 400 (was local in App) */
+  --fs-h: 32px;
+  --fs-kpi: 32px;       /* KPI value, mono tabular */
+  --fs-lede: 24px;
+  --fs-title: 24px;     /* screen title, work on a card, Newsreader */
+  --fs-work-video: 26px;
+  --fs-head: 17px;      /* section head inside a screen, Host 550 */
+  --fs-body: 16px;      /* web body */
+  --fs-body-app: 15px;  /* composer, notice body */
+  --fs-ui: 14px;        /* nav items, buttons, table cells */
+  --fs-small: 13px;     /* meta, recents, chips: the minimum for running text */
+  --fs-cap: 12px;       /* captions, ticks, mono labels: the absolute minimum */
+  --fs-mono: var(--fs-cap); /* f4: alias that Fundamentos defined locally */
+
+  /* ── PRODUCT LAYOUT RULES (2026-11-21, learned on the fact-checker viewer; spec §19) ──
+     ONE spacing scale. Every gap, inset and margin is one of these. No 4, 20-vs-16 mixes, 25 or 60 px gaps. */
+  --sp-1: 4px;    /* icon to its label only */
+  --sp-2: 8px;    /* inside one group: title -> its meta */
+  --sp-3: 12px;   /* between related groups: meta -> chips, summary -> disclaimer */
+  --sp-4: 16px;   /* card row padding (vertical) */
+  --sp-5: 20px;   /* THE panel inset: every row, head and filter in a panel uses it */
+  --sp-6: 24px;   /* between levels: chips -> summary; header -> content; bottom margin */
+  --sp-7: 32px;   /* page margin and the gutter between columns */
+  --header-h: 56px;  /* product header; nothing inside may be taller than 44 px */
+  --hit: 44px;       /* minimum tap target, built with padding, never with a visible box */
+  --panel-min: 380px;
+  --fw-ui: 400; --fw-ui-mid: 450; --fw-ui-strong: 550;
+  --track-mono: .14em; --accent-rise: .22em;
+
+  /* ── SPACE, GRID, RADII ─────────────────────────────────────────────── */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px; --s12: 48px; --s16: 64px; --s24: 96px; --s32: 128px;
+  --gutter: 24px; --gutter-mobile: 16px; --edge: 40px; --hit: 44px;
+  --content-max: 1120px;
+  --r-xs: 2px; --r-sm: 6px; --r-md: 10px; --r-glass: 14px; --r-column: 18px; --r-pill: 999px;
+
+  /* ── THE ONE APP SHELL (f4; anatomy and drawing rules: spec.md §4) ──────
+     App and Editor builders draw the same shell from these numbers. Board frame = 1312 × 880. */
+  --shell-w: 1312px; --shell-h: 880px;          /* board frame of one app window */
+  --shell-inset: 12px;                          /* sidebar gap to the window edge */
+  --sidebar: 248px; --sidebar-rail: 64px;       /* rail < 1100 px and in the Editor; sheet < 768 px */
+  --sidebar-item: 36px; --sidebar-item-gap: 2px;
+  --sidebar-wm-cap: 14px;                       /* CALVET in the sidebar */
+  --main-x: 272px;                              /* = inset + sidebar + inset */
+  --main-x-rail: 88px;                          /* = inset + rail + inset (Editor) */
+  --main-pad: 32px;                             /* content padding left and right inside main */
+  --strip-h: 120px; --strip-h-mobile: 128px;    /* world strip: one image, the line at its floor, NO point */
+  --project-kicker-y: 50px;                     /* mono kicker top, inside the strip */
+  --project-title-y: 70px;                      /* Newsreader 36 title top, inside the strip */
+  --tabs-y: 148px;                              /* = strip + 28: tab pill row */
+  --body-y: 208px;                              /* = tabs + 40 + 20: first panel */
+  --panel-gap: 16px; --panel-pad: 20px;
+  --composer-max: 720px;
+  --inspector: 304px;                           /* f4: one detail / inspector width (App detail 304, Editor 312 → 304) */
+  --topbar: 56px;                               /* Editor header row inside main */
+  --timeline: 268px;                            /* f4: Editor timeline height (was 232 token vs 268 drawn) */
+  --mobile-w: 390px; --mobile-h: 844px;
+
+  /* ── GLASS PANEL + NOTICE ───────────────────────────────────────────── */
+  --glass-fill: rgba(0,0,0,.55); --glass-fill-mobile: rgba(0,0,0,.72);
+  --glass-blur: blur(24px);
+  --glass-border: 1px solid rgba(230,220,196,.10);
+  --glass-border-hi: rgba(230,220,196,.28);          /* f4: the emphasised glass button (App .a-glass-hi) */
+  --glass-hi: inset 0 .5px 0 rgba(255,255,255,.07);  /* f4: was local in Fundamentos */
+  --glass-ring: 0 0 0 .5px rgba(255,255,255,.09);    /* f4: was local in Fundamentos */
+  --glass-lit-edge: linear-gradient(90deg, transparent, rgba(255,240,214,.75), transparent);
+  --surf-flat: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+  --hair: rgba(230,220,196,.10); --hair-strong: rgba(230,220,196,.18);
+  --row-hover: rgba(230,220,196,.04); --row-selected: rgba(230,220,196,.07);
+  --row-selected-mark: inset 2px 0 0 rgba(255,240,214,.7);
+  --notice-fill: rgba(0,0,0,.58);
+  --notice-blur: blur(24px) saturate(1.5);
+  --notice-shadow: inset 0 1px 0 rgba(255,240,214,.06), 0 12px 40px rgba(0,0,0,.45);
+  --notice-pad: 14px 16px; --notice-max: 360px;
+  --page-max: 1200px; --page-gutter: 32px;            /* f7 §19.9: every page but the media screens sits in one centred container */
+  --composer-shadow: 0 12px 40px rgba(0,0,0,.4);
+
+  /* ── VEILS OVER IMAGES (f4: the loose top-shadow gradients, now three tokens) ── */
+  --veil-top: linear-gradient(180deg, rgba(0,0,0,.55), transparent);        /* pieces, covers: height 260–360 px */
+  --veil-top-strong: linear-gradient(180deg, rgba(0,0,0,.74), transparent); /* web header over a bright sky: 230 px */
+  --veil-strip: linear-gradient(180deg, rgba(0,0,0,.5), transparent 55%);   /* app world strip */
+  --veil-bottom: linear-gradient(180deg, transparent, rgba(0,0,0,.55));     /* text set low on an image */
+  --board-bezel: #0B0D11;  /* board chrome only: phone bezel (f3 had #0b0b0b and #0B0D11) */
+
+  /* ── BARS: PILL DE CRISTAL (owner's law) ────────────────────────────────
+     Every nav, tab strip, segmented, filter, toolbar and pagination is ONE glass pill: one hairline,
+     active = brighter text + 1 px lit underline, max one bone pill at the right end.
+     Separate actions (suggestions) are separate ghost chips, never a pill. Banned: nested outlines, bone-filled tab,
+     boxed cells, flat black capsule on #000, a capsule inside a capsule. Vertical variant = sidebar column. */
+  --bar-fill: linear-gradient(100deg, rgba(10,10,10,.60) 0%, rgba(10,10,10,.48) 55%, rgba(44,31,18,.40) 100%);
+  --bar-fill-night: radial-gradient(120% 220% at 88% 0%, rgba(216,168,78,.10), transparent 58%), rgba(255,255,255,.035);
+  --bar-blur: blur(28px) saturate(1.7) brightness(.85);
+  --bar-border: 1px solid rgba(230,220,196,.12);
+  --bar-shadow: inset 0 1px 0 rgba(255,240,214,.07), 0 10px 30px rgba(0,0,0,.35);
+  --bar-h-nav: 56px; --bar-h-tool: 40px; --bar-h-mobile: 44px; --bar-h-chip: 32px;
+  --bar-item: rgba(230,220,196,.62); --bar-item-hover: rgba(230,220,196,.84); --bar-item-active: rgba(230,220,196,.96);
+  --bar-underline: linear-gradient(90deg, transparent, rgba(255,240,214,.8), transparent);
+  --bar-sep: rgba(230,220,196,.28);
+  --bar-v-mark: linear-gradient(180deg, transparent, rgba(255,240,214,.8), transparent);
+  --btn-h: 36px; --btn-h-sm: 32px; --btn-h-mobile: 44px;
+
+  /* ── CHARTS ─────────────────────────────────────────────────────────────
+     Bone for magnitude, the key amber for the ONE highlight, status never a series. One axis; baseline = the line.
+     f5: a CATEGORICAL palette (identity) for charts with >= 2 series, and the HIGHLIGHT rule (spec.md §15). */
+  --ch-surface: var(--n3);
+  /* f7 · ONE DEFAULT STATE (spec §18.2). Explanatory charts (essays, pieces, Color §04, Fundamentos "Resalte", Web essay)
+     render AT REST: no tooltip, no crosshair, no 40 % dimming. A frozen tooltip appears only in a panel labelled "hover"
+     or in a dashboard, and then always at the pinned datum below. One cursor per chart. */
+  --ch-tip-hucha: "2020";        /* x-hucha: Hucha 0 · Deuda −88 · Transferencias −234 · total −322 mm € */
+  --ch-tip-retention: "30:00";   /* retentionEp21: ep. 21 66 % · media 50 % */
+  --label-clear: 4px;            /* min gap between a direct label and ANY line, dash, tick or tooltip */
+  --text-edge: 40px;             /* every board text block ends >= 40 px from the board's right edge; it wraps, never clips */
+  --ch-seq-1: #4A4946; --ch-seq-2: #716E65; --ch-seq-3: #9D9788; --ch-seq-4: #D5CCB6;
+  --ch-s1: #D5CCB6; --ch-s2: #A29C8D; --ch-s3: #68655D;   /* s2 dash 6 4, s3 dot 2 3, direct labels */
+  --ch-hi: var(--ch-1);                                    /* max one per chart. f6: = --amber (one amber, §17.2) */
+  --ch-ref: rgba(230,220,196,.40); --ch-grid: rgba(230,220,196,.08); --ch-axis: rgba(230,220,196,.22);
+  --ch-line: 2px; --ch-bar-r: 4px; --ch-bar-gap: 2px; --ch-marker: 8px; --ch-hover: rgba(230,220,196,.06);
+  --ch-seq-bone-1: #A4987C; --ch-seq-bone-2: #827760; --ch-seq-bone-3: #5A5242; --ch-seq-bone-4: #2E2920; --ch-hi-bone: #A86F12;
+  --ch-seq-bone-5: #857B66; /* f4: bone-paper step that Ambar used locally */
+
+  /* ── CHART PALETTE · CATEGORICAL (f5, owner: "the colour code is very important") ──
+     Identity only (which series). FIXED ORDER, assigned in sequence, never cycled, never re-painted by a filter.
+     Validated with dataviz validate_palette.js on night #0E1015 (and #000) and on bone #E6DCC4 (spec.md §15.2):
+     adjacent pairs PASS 5 slots both surfaces; all pairs PASS slots 1–3 both surfaces.
+     Slot 1 AMBER = the KEY series (what the headline is about) = the chart's one highlight. A chart without a key
+     series starts at slot 2 and never shows amber. A 6th series folds into "Otros" (--ch-other), or facet.
+     Never a series: verdict colours (oxide, ring amber, lens blue, contexto grey), delta colours, gold, bone text. */
+  --ch-1: var(--amber); /* Ámbar · the key series = the highlight (night). f6: was #C48725, now the one amber #D99A2B.
+                           L 0.73 sits above the dark band (0.48–0.67) ON PURPOSE: the key is the brightest mark.
+                           Every separation check passes (validation-f6.txt). */
+  --ch-2: #598FE0;   /* Acero · steel blue. f6: was #5399D1 (h 245), now h 258, C 0.135: 23° away from the lens blue
+                        (h 235), ΔE 12.1 to Correcto text (was 9.2). Never cyan. */
+  --ch-3: #668339;   /* Musgo · moss. f6: was #526E2A 3.3:1, now L 0.57 → 4.4:1 on n3 (holds at the zero line) */
+  --ch-4: #625797;   /* Índigo · slate violet */
+  --ch-5: #C0789B;   /* Granza · rose madder, dusty (never candy) */
+  --plan: var(--ch-2); --plan-text: #8DB3EC; /* S6: the planned state (steel blue), always dashed and with its word */
+  --ch-other: rgba(230,220,196,.32); /* "Otros" and context series: bone, not a hue */
+  --ch-ref-dash: 6 4;                /* f6: the COMPARISON series ("media de la temporada", benchmarks): --ch-other,
+                                        1.5 px, dash 6 4, direct label. Never a slot hue, never Acero. */
+  --ch-ref-w: 1.5px;
+  --ch-1-bone: #A86F12; --ch-2-bone: #3069B2; /* f6: Acero bone h 245 → 256, ΔE 11.1 to lens-1 (was 8.3) */ --ch-3-bone: #425D13; --ch-4-bone: #58488A; --ch-5-bone: #A96186;
+  --ch-other-bone: rgba(22,19,15,.28);
+  --ch-key: var(--ch-1);             /* alias: the key series and the headline highlight share it */
+  --ch-key-bone: var(--ch-1-bone);
+  --ch-gap: 2px;                     /* surface gap between stacked segments and adjacent bars (dataviz spacer) */
+  --ch-zero: rgba(230,220,196,.72);  /* the zero baseline of a diverging / signed chart: 1.5 px, the strongest rule */
+  --ch-zero-bone: rgba(22,19,15,.80);
+  --ch-zero-w: 1.5px;
+
+  /* ── HIGHLIGHT · explanatory charts (f5, from the owner's reference) ──
+     The headline marks its key words with a box in the KEY-series amber and night text, so the words and the series
+     they name read as one thing. Max 2 boxes per headline, only words that name the key series or the conclusion.
+     On bone paper the box is the bone-step amber with bone-ink text (4.4:1: headline sizes only, >= 24 px). Never on a dashboard chart (it states, not explains). */
+  --hl-fill: var(--ch-key);          /* box behind the key words (night) */
+  --hl-text: #0E1015;                /* night ink on the amber box: 7.8:1 (f6, on #D99A2B) */
+  --hl-fill-bone: var(--ch-key-bone);
+  --hl-text-bone: var(--bone-ink);   /* 4.4:1 on #A86F12: large text only (headline >= 24 px) */
+  --hl-pad: .04em .22em .06em;       /* box padding around the words */
+  --hl-radius: 2px;
+
+  /* ── DELTA · up / down in KPIs and tables (f5, owner: "green or red, clearly distinguishable") ──
+     Text only (mono), ALWAYS sign + arrow + value: "▲ +23 %", "▼ −4,1 %", "= 0 pt". Never a fill, a bar, a disc, a
+     chip or a verdict shape; never in a plot. Colour = better / worse, the ARROW = direction: a metric where less is
+     better (errores, abandono) declares better: "down", so its ▼ wears --delta-up colour. Neutral = t2 with "=".
+     Distinct from Falso (oxide disc ×) and Correcto (lens seal ✓): different hue or lightness + no shape (spec.md §15.3). */
+  --delta-up: #88D196;      /* better · sage-green, 10.5:1 on n3 */
+  --delta-down: #F9663A;    /* worse · f6 orange-vermilion (h 37, was #EF6856 h 30): ΔE 15.4 to Falso mark, 11.9 to
+                               Falso text, 12.7 to amber; 6.3:1 on n3, APCA Lc 45.5; ≥ 13 px mono 500 */
+  --delta-flat: var(--t2);  /* no change */
+  --delta-up-bone: #14653D;   /* f6: 5.2:1 on bone (was #206B38; one step deeper so the pair keeps CVD ΔE ≥ 8.6) */
+  --delta-down-bone: #BA0329; /* f6: carmine, 4.9:1 on bone (was #721022, read as ink). ΔE 7.5 to Falso bone: told
+                                 apart by chroma (0.20 vs 0.13) + arrow + no disc; never in a cell with the disc */
+  --delta-flat-bone: var(--ink2);
+  --delta-glyph-up: "▲"; --delta-glyph-down: "▼"; --delta-glyph-flat: "=";
+
+  /* ── THE LINE ───────────────────────────────────────────────────────────
+     One horizontal line per screen. Paintings stand on it, reflections and bars hang below. */
+  --line: 1px solid rgba(230,220,196,.22);
+  --line-ink: rgba(230,220,196,.34);   /* the line over an image (web floor .42 on bright art) */
+  --line-ink-bright: rgba(230,220,196,.42);
+  --horizon-y: 58%;
+  --bar-w: 3px; --bar-gap: 3px; --bar-max: 72px;
+  --cut-angle: 45deg; --bevel: 16px;   /* max one 45° per screen, none on covers */
+
+  /* ── WATERLINE MORSE (Galería) ─────────────────────────────────────────
+     Content stays LIBERTAS and PENDIENTE (owner still deciding). f4: the beads are BONE, not amber, so the pending
+     element no longer breaks the amber rule. Only on the Galería waterline; do not reuse the beads elsewhere. */
+  --bead: var(--t3);   /* bone at 58 % */
+  --bead-th: 3px; --bead-word: 312px; --bead-gap: 24px;
+  --bead-point: 9px;   /* the single FILLED beat point (amber): playhead, now, end of video. Not a bead. */
+
+  /* ── SONANDO · ONE component (f5) ─────────────────────────────────────
+     What is playing now, everywhere (web hero card, podcast table row, app, editor transcript):
+     three static bone bars 2 × (6 / 10 / 4 px), gap 2 + "Sonando" mono 12 t1 + the player button shows PAUSE.
+     Never a play icon beside "Sonando" (then it is "En pausa", t2, bars at --bar-rest). Never amber: the amber
+     of a player is only the knob (--playhead) and EN VIVO. In a transcript the spoken word = 1 px bone underline. */
+  --sonando-ink: var(--t1);
+  --sonando-bar-w: 2px; --sonando-bar-gap: 2px; --sonando-h: 10px;
+  --spoken-underline: 1px solid var(--t1);
+
+  /* ── THE GESTURE, STATIC FORM (owner 2026-11-21) ────────────────────────
+     The line + ONE point UNDER THE V of the wordmark, over ONE image. No second image below the cut:
+     the line is drawn OVER the image, and the same image continues under it. Cutting between images exists only
+     in motion (parked). The point is the wordmark's own V outline below its baseline, scaled (never redrawn).
+     Keel column x: read Q.mark('D10', cap).keelX (f6). Draw the point ONLY with f6/vpoint.js traceV (spec §17.5). */
+  /* f6: values for mark key 'D10' (read vpoint.keelX(cap) / Q.mark('D10', cap).keelX, do not retype) */
+  --keel-x-14: 44.5px;    /* cap 14: sidebar, nav pill */
+  --keel-x-18: 56.5px;    /* cap 18: mobile header */
+  --keel-x-36: 108.5px;   /* cap 36 */
+  --keel-x-72: 216.5px;   /* cap 72: web header */
+  --keel-x-96: 288.5px;   /* cap 96: video frame 1920 × 1080 (end card, covers) */
+  --keel-depth: .30;      /* notch depth in cap units: the D10 V drop at 2/3 depth and 0.43 width (owner + panel, option D); foot >= 10 px */
+  --keel-tooth: .22;      /* f6: end card only, the lowest 22 % of the V is filled --beat = "terminado" (no disc) */
+  --keel-scale: 3;        /* web desktop: the V at cap 300 → depth 114 px */
+  --keel-scale-mobile: 1.15;
+  --keel-scale-video: 1.5;/* 1920 × 1080 pieces: the V at cap 150 → depth 57 px */
+  --keel-stroke: 1px;     /* the line: bone, --line-ink; no glow, no shadow */
+  --keel-v-stroke: 1.5px; /* f5: the point under the V carries more visible weight than the line it dips from */
+  --keel-v-ink: rgba(230,220,196,.66); /* f5: the V outline below the floor (line stays .34 / .42) */
+  --keel-v-ink-bone: rgba(22,19,15,.66); /* f6: the same outline on bone paper */
+  --keel-clear: 16px;     /* min distance from the point and the line to any control or text */
+  --keel-under: 16px;     /* f4: the SAME image continues >= depth + 16 px below the floor (never empty black) */
+  --keel-fade: 96px;      /* f4: after that, the image may fade to --ground over this height */
+  --app-point: none;      /* f4 REVERSIBLE DEFAULT: the app shows the line only. Point allowed only where the
+                             wordmark itself sits over an image (spec.md §6). Never in a control or a sidebar. */
+
+  /* ── IMAGE GRADE + REFLECTION ───────────────────────────────────────── */
+  /* f7: saturation is per painting (--sat from data.json paintings[k].sat, default .8). The rest grade applies on EVERY
+     surface for a painting whose data says "alwaysGraded": true (La novena ola, Sorolla): also when active or a hero. */
+  --grade-idle: brightness(var(--lift, 1.1)) contrast(var(--con, 1.04)) saturate(var(--sat, .8));
+  --grade-strip: brightness(calc(.7 * var(--lift, 1))) contrast(var(--con, 1.04)) saturate(var(--sat, .8)); /* f4: app world strip */
+  /* f7 · EMPTY COVER (an item with no painting yet: draft, or painting not registered). Never a stand-in painting. */
+  --cover-empty-fill: var(--n3);
+  --cover-empty-border: 1px solid var(--hair);   /* inset */
+  --cover-empty-label: var(--t3);                /* mono 12 "Sin cuadro", only when the cover is >= 72 px wide */
+  --idle-opacity: .72;
+  --grade-frame: saturate(.2) contrast(1.15);
+  --grade-under-glass: brightness(.7);
+  --refl-opacity: .25; --refl-fade: linear-gradient(#000, transparent 30%); --refl-gap: 3px;
+
+  /* ── MOTION · PARKED (owner designs motion and sound himself, at the end) ──
+     Values unchanged from f3 so existing files resolve. Do not tune, extend or prototype from here.
+     Tool motion that is NOT the brand gesture stays in force: --ease, --t-ui, --t-panel, --t-toast, --t-undo. */
+  --ease: cubic-bezier(.7,0,.2,1);
+  --t-ui: 180ms;          /* hover, press, tab, toggle */
+  --t-panel: 200ms;       /* sheet, menu, popover, notice in */
+  --t-toast: 6s;          /* auto-dismiss; verdicts and errors never auto-dismiss */
+  --t-undo: 8s;
+  --t-title: 600ms; --t-gold: 300ms; --t-sweep: 2800ms; --t-cut: 0ms; --t-dive: 1452ms; --t-end-black: 1936ms;
+  --t-morse: 14s; --t-ripple: 8s; --keel-lit: 600ms; --keel-cuts-max: 8; --bpm: 124; --beat-ms: 484ms; /* PARKED */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-ui: 0ms; --t-panel: 0ms; --t-title: 0ms; --t-gold: 0ms; --t-sweep: 0ms; --t-dive: 0ms; --t-ripple: 0s; --keel-cuts-max: 0; }
+}

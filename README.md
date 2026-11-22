@@ -7,7 +7,7 @@
 **A second, critical ear for YouTube.**<br>
 Fallacies, false figures, contradictions and dodged questions, flagged at the second they are said.
 
-[Install in one sentence](INSTALL-AGENT.md) · [How it works](#-how-it-works) · [Inside the code](https://alexgcalvet.github.io/fact-checker/) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md)
+[Install in one sentence](INSTALL-AGENT.md) · [How it works](#-how-it-works) · [The web](#-the-web) · [Roadmap](#-roadmap) · [Inside the code](https://alexgcalvet.github.io/fact-checker/) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md)
 
 <sub>AI agent: if a person gave you only this repository's URL, follow <a href="INSTALL-AGENT.md">INSTALL-AGENT.md</a> to install fact-checker.</sub>
 
@@ -51,6 +51,24 @@ Fallacies, false figures, contradictions and dodged questions, flagged at the se
 Your conversations and keys stay on your machine. Nothing is shared unless you say yes.
 
 🗺️ **[Inside the code](https://alexgcalvet.github.io/fact-checker/)**: an interactive page with every component, the flow of one video, the database, and the exact prompts that each model reads.
+
+## 🌐 The web
+
+No install needed to read what has already been checked. The same flags, on a web page.
+
+**[Open the web](https://fact-checker-feedback.alexgcalvet7.workers.dev/en/)** · in English and Spanish
+
+| Page | What you get |
+|---|---|
+| **Videos** | the analysed videos, with filters and a grid or list view |
+| **Viewer** | the video with its flags beside it, each lit at its second; mark a flag **✓ Agree** or **✗ Disagree** and comment on it |
+| **Profile** | the figures of one guest, with a card you can download |
+| **Comparison** | two guests of a debate, side by side |
+| **How it works** | the route of a video from its captions to the published flags, and where each mark comes from |
+
+- Only analyses that the author has read and approved are shown. The author can hide a flag, and switch a whole video off.
+- The web is not announced yet: it is not indexed by search engines.
+- Marks and comments are anonymous: a random id in your browser, with no name, email or IP.
 
 ## 🚀 Install
 
@@ -105,6 +123,20 @@ The interface follows your browser's language. Change it in ⚙ in the side pane
 - It knows what was said in the video and what it finds on the web at that moment. It does not yet know a speaker's long-term record.
 - Videos without captions are transcribed on your machine, which takes time: about 35 minutes for a one-hour video on a laptop CPU.
 - Spanish and English only. Windows is not supported yet.
+
+## 🗺️ Roadmap
+
+Everything is **version 0**: the method still changes. Each new version adds one step. The same line is on the web, in [How it works](https://fact-checker-feedback.alexgcalvet7.workers.dev/en/how-it-works).
+
+| Version | Step | State | What it brings |
+|---|---|---|---|
+| v0 | **Personal extension** | ✅ done | flags over the YouTube player, with quote, reason, confidence and source; a judge that lowers small slips; profile and comparison cards; one-step install; shared analyses that a person approves |
+| v0.1 | **Public web** | ✅ done | the same in the browser, with nothing to install; a review page and a public API; viewer with marks and comments, list with filters, profiles with a downloadable card; Spanish and English |
+| v0.2 | **Measurable verdicts and evidence** | 🟡 in progress | five verdict levels with their reason; one table behind every figure; "X of N true" with a bar, no percentage; each source with its type; insinuations checked through the fact they rest on; a run never stops for cost; evaluations: cases with a human label, fixed before any result, and the precision of each kind of flag |
+| v0.3 | **Live analysis** | ⚪ next | flags on what is said now, not only on recorded videos; windows of 10 to 30 seconds; provisional flags that can be withdrawn; an indicator of what is being checked; free, low-latency transcription |
+| v0.4 | **Feedback connected to evaluations** | ⚪ next | your marks and comments become cases of the evaluations; each change to the instructions is tested with them before it is accepted; nobody edits a published analysis, the next videos improve |
+
+The design of each step lives in [docs/RFC.md](docs/RFC.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## 🤝 Contributing
 

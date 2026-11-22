@@ -23,7 +23,7 @@ approval: agent
 acceptance_dir: tests/acceptance
 
 # The command that /mini-implement runs before it proposes commits.
-verify: (cd src/helper && uvx --quiet pytest -c pyproject.toml -q) && (cd src/extension && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run)
+verify: (cd src/helper && uvx --quiet pytest -c pyproject.toml -q) && (cd src/web && npx tsc --noEmit && npx vite build --logLevel warn) && bash tests/web/check-brand.sh && ! grep -rnE '#[0-9a-fA-F]{3,8}\b' src/web/src && (cd src/extension && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run)
 
 
 # The segments that .claude/statusline.sh shows, in a list. on shows all of them, off hides the status line.

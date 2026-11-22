@@ -55,7 +55,7 @@ A real-time conversation analyst: it listens to a live conversation and flags co
 ## Domain
 - **Every flag cites its evidence.** A flag quotes the exact utterance, names its type (contradiction, bias, fallacy, inaccuracy) and gives a short reason. A factual flag also names its source.
 - **A flag is a signal, not a verdict.** Show a confidence on each flag. Never call a speaker a liar or attack the person.
-- **False positives cost more than misses.** A noisy live feed gets ignored. Tune for precision first.
+- **In the beta, recall comes first.** More flags bring more marks. Nothing goes public before the owner approves it.
 - **Latency is a requirement.** A flag that arrives after the topic has moved on has little value. Measure the time from utterance to flag.
 - **Conversations are personal data.** Never commit real recordings or transcripts. Use synthetic or consented samples in `tests/` and research.
 
@@ -64,8 +64,9 @@ A real-time conversation analyst: it listens to a live conversation and flags co
 <Map each top-level directory to its purpose, one line each. Note any published artifact URL next to the file it belongs to, and say to republish to that same URL when the file changes.>
 
 - `docs/`: documentation (`RFC.md`, `ARCHITECTURE.md`, `index.html`, the living page of the project that `/explore` updates and `/rfc` reads, and `specs/` for mini-specs, with `specs/index.html`, the spec page that `/mini-spec` and `/mini-implement` update)
+- `docs/BACKLOG.md`: work found outside a slice (bugs, changes, measurements), one row each; pick its route before you start it
 - `docs/research/`: research reports, one per topic, each starting with its sources. `/explore` and `/rfc` read them, and `/rfc close` archives the ones that the RFC cites
 - `docs/archive/`: finished RFCs and slices, one numbered folder each (`/rfc close` creates them), listed in `docs/archive/README.md`. Read that index to find one. Do not read or edit the archive otherwise
 - `src/`: source code
-- `tests/`: tests, one suite per part. `tests/helper/test_<part>.py`, `tests/extension/<screen>.test.ts`, `tests/collector/<route>.test.ts`, `tests/contracts/` (one per external system), `tests/support/` (shared fakes and helpers, no test), `tests/fakes/` (recorded answers), `tests/golden/`. `tests/acceptance/` holds only the acceptance tests of the open slices
+- `tests/`: tests, one suite per part. `tests/helper/test_<part>.py`, `tests/extension/<screen>.test.ts`, `tests/web/<screen>.test.ts`, `tests/collector/<route>.test.ts`, `tests/contracts/` (one per external system), `tests/support/` (shared fakes and helpers, no test), `tests/fakes/` (recorded answers), `tests/golden/`. `tests/acceptance/` holds only the acceptance tests of the open slices
 - `evals/`: measurements on real interviews or paid models, one line each in `evals/README.md`; CI never runs them

@@ -25,8 +25,9 @@ class Answer(dict):
 class CodexCLI:
     """Codex CLI headless (`codex exec`) on the person's ChatGPT subscription."""
 
-    def __init__(self, workdir: Path, model: str | None = None, timeout: int = 300):
+    def __init__(self, workdir: Path, model: str | None = None, timeout: int = 300, keys: tuple = ()):
         self.workdir = Path(workdir)
+        self.keys = keys  # environment variables the reading never gets
         self.model = model
         self.timeout = timeout
 
@@ -53,7 +54,8 @@ class CodexCLI:
                 "--output-schema", f"{tmp}/schema.json", *([] if session else ["--ephemeral"]), "-"]
             proc = subprocess.Popen(
                 [codex_cli() or "codex", *head, *options], cwd=self.workdir, stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+                env={k: v for k, v in os.environ.items() if k not in self.keys})
             try:
                 stdout, stderr = proc.communicate(text, timeout=self.timeout)
             except subprocess.TimeoutExpired:

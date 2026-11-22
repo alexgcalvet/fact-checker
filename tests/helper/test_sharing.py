@@ -352,7 +352,8 @@ def test_sharing_off(tmp_path, monkeypatch):
 # does, then polls the flag file until it is no longer running.
 
 ALLOWED = {"video_id", "lang", "spoken", "status", "published_at", "title", "channel", "duration", "speakers",
-           "claims", "questions", "readers", "cost_usd", "analysed_until", "helper_version", "flags"}
+           "claims", "questions", "readers", "cost_usd", "analysed_until", "helper_version", "flags",
+           "summary"}  # S4: each guest's tally
 
 
 def analyse(base: str, video: str, start: int = 0, lang: str = "es") -> dict:
@@ -387,9 +388,9 @@ def test_whole_analysis_uploads(tmp_path, monkeypatch):
         assert put["path"] == "/analyses/esview" and put["query"] == {"lang": ["es"]}, \
             f"FAIL S28 A1 · uploaded to {put['path']} {put['query']}"
 
-        # Case 2 · the body → the install id and the stripped analysis, nothing else
+        # Case 2 · the body → the install id, the stripped analysis and its prompts file (S7), nothing else
         body = put["body"]
-        assert set(body) == {"install_id", "analysis"}, f"FAIL S28 A1 · body fields {sorted(body)}"
+        assert set(body) == {"install_id", "analysis", "prompts"}, f"FAIL S28 A1 · body fields {sorted(body)}"
         assert body["install_id"] == (home / "install-id").read_text().strip(), "FAIL S28 A1 · not the install id"
         shared = body["analysis"]
         assert set(shared) <= ALLOWED, f"FAIL S28 A1 · extra fields {sorted(set(shared) - ALLOWED)}"
@@ -522,7 +523,8 @@ def test_sharing_off_uploads_nothing(tmp_path, monkeypatch):
 #
 # Story: A stranger uploads an analysis of video "abcdefgh" in Spanish: the collector answers 202 and serves nothing for
 # it. The owner runs `fact-checker shared list` and sees one line: abcdefgh, es, opus, 2 flags, the uploader's install id
-# and the date. `fact-checker shared approve abcdefgh es` makes it served to anyone; `reject` on another one deletes it
+# and the date. `fact-checker shared approve abcdefgh es` makes that upload served to anyone; with two uploads of one
+# video it names both and approves only the one given with `--install`. `reject` on another one deletes it
 # and it is never served. An upload from the owner's own helper (with the admin token in its `.env`) is served at once.
 # A row shared before this slice is pending until the owner approves it.
 #
@@ -533,11 +535,16 @@ def test_sharing_off_uploads_nothing(tmp_path, monkeypatch):
 # tests/collector/analyses.test.ts (S30 A1).
 
 STRANGER = "11111111-1111-4111-8111-111111111111"
+OTHER_INSTALL = "22222222-2222-4222-8222-222222222222"
 PENDING = [
     {"video_id": "abcdefgh", "lang": "es", "model": "opus", "flags": 2, "install_id": STRANGER,
      "received_at": "2026-11-15T10:00:00.000Z"},
     {"video_id": "otherone", "lang": "es", "model": "sonnet", "flags": 5, "install_id": STRANGER,
      "received_at": "2026-11-15T11:00:00.000Z"},
+    {"video_id": "twotimes", "lang": "es", "model": "sonnet", "flags": 3, "install_id": STRANGER,
+     "received_at": "2026-11-15T12:00:00.000Z"},
+    {"video_id": "twotimes", "lang": "es", "model": "opus", "flags": 9, "install_id": OTHER_INSTALL,
+     "received_at": "2026-11-15T13:00:00.000Z"},
 ]
 
 
@@ -564,12 +571,23 @@ def test_shared_review(tmp_path, monkeypatch, capsys):
         assert "otherone" in out and TOKEN not in out
         assert collector.requests[-1]["path"] == "/analyses" and collector.requests[-1]["auth"] == f"Bearer {TOKEN}"
 
-        # Case 3 · approve abcdefgh es → POST /analyses/abcdefgh/approve?lang=es with the token; exit 0
+        # Case 3 · approve abcdefgh es → POST /analyses/abcdefgh/approve naming its one upload, with the token; exit 0
         code, out = run(monkeypatch, capsys, "shared", "approve", "abcdefgh", "es")
         last = collector.requests[-1]
         assert code == 0, f"FAIL S30 A1 · approve exited {code}: {out!r}"
         assert (last["method"], last["path"], last["query"], last["auth"]) == \
-            ("POST", "/analyses/abcdefgh/approve", {"lang": ["es"]}, f"Bearer {TOKEN}")
+            ("POST", "/analyses/abcdefgh/approve",
+             {"lang": ["es"], "install": [STRANGER], "at": ["2026-11-15T10:00:00.000Z"]}, f"Bearer {TOKEN}")
+
+        # Case 3b · two uploads of twotimes → approve names both and sends nothing; --install picks one; exit 0
+        sent = len(collector.requests)
+        code, out = run(monkeypatch, capsys, "shared", "approve", "twotimes", "es")
+        assert code == 1 and STRANGER in out and OTHER_INSTALL in out, f"FAIL · two uploads: {code} {out!r}"
+        assert all(r["method"] != "POST" for r in collector.requests[sent:]), "FAIL · approved one of two uploads"
+        code, out = run(monkeypatch, capsys, "shared", "approve", "twotimes", "es", "--install", STRANGER[:8])
+        last = collector.requests[-1]
+        assert code == 0 and last["path"] == "/analyses/twotimes/approve" and last["query"]["install"] == [STRANGER], \
+            f"FAIL · --install: {code} {last}"
 
         # Case 4 · reject otherone es → POST /analyses/otherone/reject?lang=es; the list is then empty
         code, out = run(monkeypatch, capsys, "shared", "reject", "otherone", "es")

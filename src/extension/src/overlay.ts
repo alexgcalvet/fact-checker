@@ -550,6 +550,7 @@ export function mountOverlay(
     }, () => { /* the extension was reloaded: keep the defaults */ });
   } catch { /* no extension storage: keep the defaults */ }
   layer.addEventListener("fc-settings", draw);
+  layer.addEventListener("fc-flags", draw);
   video.addEventListener("timeupdate", render);
   video.addEventListener("seeked", render);
   draw();

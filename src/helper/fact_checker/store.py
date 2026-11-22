@@ -12,13 +12,17 @@ def default_home() -> Path:
     return Path(os.environ.get("FACT_CHECKER_HOME", Path.home() / ".fact-checker"))
 
 
+# One lock per helper home: an analysis and the server each hold a Store of the same home, and both rewrite its files.
+_locks: dict[Path, threading.RLock] = {}
+
+
 class Store:
     """Flag files, candidates log, claims log and usage log under the helper home."""
 
     def __init__(self, home: Path):
         self.home = Path(home)
         (self.home / "videos").mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
+        self.lock = _locks.setdefault(self.home.resolve(), threading.RLock())
 
     def _path(self, video_id: str) -> Path:
         return self.home / "videos" / f"{video_id}.json"
@@ -28,7 +32,7 @@ class Store:
         return json.loads(path.read_text()) if path.exists() else None
 
     def save(self, data: dict) -> None:
-        with self._lock:
+        with self.lock:
             path = self._path(data["video_id"])
             tmp = path.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1))
@@ -68,7 +72,8 @@ class Store:
     def marks(self, video_id: str) -> dict[str, str]:
         """The latest verdict per flag id of one video."""
         path = self.home / "marks.jsonl"
-        rows = [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+        with self.lock:
+            rows = [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
         return {r["flag_id"]: r["verdict"] for r in rows if r["video_id"] == video_id}
 
     def log_usage(self, entry: dict) -> None:
@@ -77,6 +82,6 @@ class Store:
     def _append(self, name: str, rows: list[dict]) -> None:
         if not rows:
             return
-        with self._lock, open(self.home / name, "a") as f:
+        with self.lock, open(self.home / name, "a") as f:
             for row in rows:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")

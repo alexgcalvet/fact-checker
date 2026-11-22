@@ -2,9 +2,12 @@
 // (prepare, bind, first, run, all, batch), as the D1 Worker API docs describe them. A batch is one transaction.
 // The schema is the collector's own schema.sql.
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
 
-const SCHEMA = new URL("../../src/collector/schema.sql", import.meta.url);
+// A path, not `new URL(…, import.meta.url)`: in a jsdom test, Vite rewrites that into a web address.
+const SCHEMA = join(dirname(fileURLToPath(import.meta.url)), "../../src/collector/schema.sql");
 
 export function fakeD1() {
   const db = new DatabaseSync(":memory:");

@@ -558,3 +558,79 @@ describe("The poll of the flag file tells the helper where the person is, so the
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8765/videos/abc123?at=754");
   });
 });
+
+// Inline 2026-11-22 · A new video never shows the flags of the one before
+//
+// Story: The person opens video A, whose analysis is running, and moves to video B before the helper answers for A.
+// A's late answer arrives while B is on screen. B shows its own state (no file yet: the start button), and the
+// extension stops asking about A.
+//
+// Setup: a jsdom watch page with a player and a video, fake timers, and a stub `chrome` whose service worker holds the
+// first flag answer for A until the test releases it; B has no flag file.
+describe("A new video never shows the flags of the one before", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+  it("A's late answer after a move to B → B shows its start button, and nobody asks about A again", async () => {
+    vi.useFakeTimers();
+    const RUNNING_A = { video_id: "aaa111", status: "running", stop_reason: null, analysed_until: 0, flags: [] };
+    let release: (value: object) => void = () => {};
+    const held = new Promise<object>((done) => { release = done; });
+    const sendMessage = vi.fn(async (req: any) =>
+      req.kind === "flags" && req.videoId === "aaa111" ? held : { ok: true, data: null });
+    vi.stubGlobal("chrome", {
+      runtime: { id: "x", sendMessage, onMessage: { addListener: () => {} } },
+      storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } },
+    });
+    vi.resetModules();
+    history.pushState({}, "", "/watch?v=aaa111");
+    document.body.innerHTML = '<div id="movie_player"><video></video></div>';
+    await import("../../src/extension/src/content");
+    await vi.advanceTimersByTimeAsync(0);
+
+    history.pushState({}, "", "/watch?v=bbb222");
+    document.dispatchEvent(new Event("yt-navigate-finish"));
+    await vi.advanceTimersByTimeAsync(0);
+    release({ ok: true, data: RUNNING_A });
+    const before = sendMessage.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    const asked = sendMessage.mock.calls.slice(before).map(([req]) => req);
+    expect(asked.filter((req) => req.videoId === "aaa111")).toEqual([]);
+    expect([...document.querySelectorAll("button")].some((b) => b.textContent === "Analizar este vídeo")).toBe(true);
+    vi.clearAllTimers();
+  });
+});
+
+// Inline 2026-11-22 · A flag that arrives while the video is paused shows at once
+//
+// Story: The person pauses the video while its analysis runs. The next poll brings a new flag. The panel lists it
+// without waiting for playback to resume.
+//
+// Setup: a jsdom watch page with a paused video (no timeupdate fires), fake timers, and a stub `chrome` whose service
+// worker answers a running analysis with no flag, then the same analysis with one invented flag.
+describe("A flag that arrives while the video is paused shows at once", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+  it("the poll brings a flag while paused → the panel lists its quote with no timeupdate", async () => {
+    vi.useFakeTimers();
+    const QUOTE = "una cifra inventada en pausa";
+    const flag = { id: "false-1.0", t: 0.5, speaker: "Ana", quote: QUOTE, type: "inaccuracy", label: "false",
+      reason: "Motivo inventado.", confidence: 0.9, related: null, sources: [], note: null, on_player: true };
+    let file: object = { video_id: "ccc333", status: "running", stop_reason: null, analysed_until: 0, flags: [] };
+    vi.stubGlobal("chrome", {
+      runtime: { id: "x", sendMessage: vi.fn(async (req: any) => (req.kind === "flags" ? { ok: true, data: file } : { ok: true })),
+                 onMessage: { addListener: () => {} } },
+      storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } },
+    });
+    vi.resetModules();
+    history.pushState({}, "", "/watch?v=ccc333");
+    document.body.innerHTML = '<div id="movie_player"><video></video></div>';
+    await import("../../src/extension/src/content");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.body.textContent).not.toContain(QUOTE);
+    file = { ...file, flags: [flag] };
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(document.body.textContent).toContain(QUOTE);
+    vi.clearAllTimers();
+  });
+});

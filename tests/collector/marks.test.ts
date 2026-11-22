@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "../../src/collector/src/index";
 import { fakeD1 } from "../support/d1_fake";
+import { fakeLimit } from "../support/limit_fake";
 
 // S24 A3 · The collector keeps valid marks and refuses bad requests
 //
@@ -22,7 +23,7 @@ import { fakeD1 } from "../support/d1_fake";
 
   function collector() {
     const DB = fakeD1();
-    const env = { DB, ADMIN_TOKEN: "admin-secret" } as any;
+    const env = { DB, WRITES: fakeLimit(), ADMIN_TOKEN: "admin-secret" } as any;
     const post = (installId: string, marks: unknown[], extra: object = {}) =>
       worker.fetch(new Request("https://collector.example/marks", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -120,7 +121,7 @@ describe("S24 A4 · The owner pulls the new rows with the admin token (the colle
   });
 
   async function collector() {
-    const env = { DB: fakeD1(), ADMIN_TOKEN: "admin-secret" } as any;
+    const env = { DB: fakeD1(), WRITES: fakeLimit(), ADMIN_TOKEN: "admin-secret" } as any;
     const post = (installId: string, marks: unknown[]) => worker.fetch(new Request("https://collector.example/marks", {
       method: "POST", body: JSON.stringify({ install_id: installId, helper_version: "0.1.0", marks }),
     }), env);

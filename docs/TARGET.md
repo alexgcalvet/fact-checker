@@ -18,8 +18,7 @@ A viewer watches a YouTube video and sees, at the exact second, short flags on w
 | Install | One script and `setup`/`doctor` on macOS and Linux | today |
 | Collector | The owner's Cloudflare Worker + D1: testers' marks and shared analyses, served after the owner approves them | today |
 | Backend | Runs the pipeline on a server; analyses each video once for every viewer | Step 2 |
-| Web player page | Embedded player with the flags beside it, each lit at its second; works on mobile; the profile card links here (2026-11-16, chat) | Step 2 |
-| Report page | One shareable page per analysed video | Step 2 |
+| Web player page | Embedded player with the flags beside it, each lit at its second; works on mobile; also the shareable report of the video; the profile card links here (2026-11-16, chat) | Step 2 |
 | Caption upload | The extension sends the captions that the player loads to the backend | Step 2 |
 | Live mode | Streaming transcription and an API with streaming; fallacy flags within about 5–10 s of the utterance | Step 3 |
 
@@ -47,3 +46,4 @@ A viewer watches a YouTube video and sees, at the exact second, short flags on w
 | Each person pays their own readings in Step 1; the owner pays only the collector, on the free plan (docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/specs/021-beta-install/spec.md, docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/specs/024-shared-feedback/spec.md) | No cost to the owner per video | A tester cannot afford a video, or the collector leaves the free plan |
 | A shared analysis per video and language, served only after the owner approves it (docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/specs/028-shared-analyses/spec.md, docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/specs/030-ready-to-publish/spec.md) | Cost is paid once per video, not per viewer; nobody can plant flags | Step 2 analyses on a server |
 | Phase 2 budget ≤ €3 per video-hour (docs/archive/001-personal-fact-checker-for-recorded-youtube-videos/research/interview-youtube-fact-checker.md) | Keeps a free tier viable | Measured cost of Step 1 differs by 2x |
+| Step 2 starts with a public web page over approved analyses, not a backend (docs/archive/002-public-web-of-approved-analyses-backend-first/RFC.md) | Reach with no install and no cost per viewer; the owner's approval filters what goes public | Web viewers ask for videos nobody analysed |

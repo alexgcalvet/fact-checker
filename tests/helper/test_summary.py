@@ -619,3 +619,68 @@ def test_too_many_or_unknown(tmp_path, monkeypatch, capsys):
     lines = printed.strip().splitlines()
     assert len(lines) == 1 and "nosuch36" in lines[0], f"FAIL S36 A2 · the line does not name the id: {printed!r}"
     print("PASS S36 A2 · The same person in two interviews is one column")
+
+
+# Inline · A debate of two guests compares in one card
+#
+# Story: The person analyses an invented debate between Ana Ruiz and Xoán Pereira, led by a host. `fact-checker compare
+# debate37` with that one id writes one card with a column per debater, headed "Debate", and no host column. The alt
+# text starts with "Debate", never "1 entrevistas".
+
+FACE_OFF = interview("debate37", "Ana Ruiz (invitada)", "Ana Ruiz", spoken_s=1500, claims=8, asked=4, false=1,
+                   misleading=0, nitpicks=0, serious=1, device="false_dilemma", repeats=1, dodged=0,
+                   title="Cara a cara")
+FACE_OFF[0]["people"]["Xoán Pereira (invitado)"] = {"role": "guest", "person": "Xoán Pereira", "spoken_s": 1400,
+                                                  "set_by": "llm"}
+FACE_OFF[0]["claims"]["Xoán Pereira (invitado)"] = 10
+
+
+def test_debate_in_one_card(tmp_path, monkeypatch, capsys):
+    home, out = tmp_path / "home", tmp_path / "out"
+    out.mkdir()
+    save(home, FACE_OFF)
+    code, printed = compare(home, out, monkeypatch, capsys, "debate37")
+    assert code == 0, f"FAIL debate · compare of one debate exited {code}: {printed!r}"
+    card, alt = visible((out / "compare.png").read_text()), (out / "compare.txt").read_text()
+    assert card.index("Ana Ruiz") < card.index("Xoán Pereira"), f"FAIL debate · a debater has no column: {card!r}"
+    assert card.startswith("Debate") or "Debate · «Cara a cara»" in card, f"FAIL debate · no 'Debate' header: {card!r}"
+    assert "entrevista" not in card and "Presentador" not in card, f"FAIL debate · interview header or host: {card!r}"
+    assert alt.startswith("Debate") and "entrevistas" not in alt, f"FAIL debate · the alt text: {alt!r}"
+
+
+# Inline · Each debater's column shows their half of the video thumbnail
+#
+# Story: A debate thumbnail shows one candidate on the left and the other on the right. On the face-off card, the
+# first column shows the left half and the second the right half; with --swap, the halves change sides, so each
+# column can show its own person.
+
+def test_debate_thumbnail_halves(tmp_path, monkeypatch, capsys):
+    home, out = tmp_path / "home", tmp_path / "out"
+    out.mkdir()
+    save(home, FACE_OFF)
+
+    def sides(*args):
+        code, printed = compare(home, out, monkeypatch, capsys, "debate37", *args,
+                                thumbnail="data:image/png;base64,AAAA")
+        assert code == 0, f"FAIL halves · compare exited {code}: {printed!r}"
+        return re.findall(r'<img src="data:[^"]*" class="half (left|right)"', (out / "compare.png").read_text())
+
+    assert sides() == ["left", "right"], "FAIL halves · the columns do not show the left, then the right half"
+    assert sides("--swap") == ["right", "left"], "FAIL halves · --swap does not change the halves"
+
+
+# Inline · Each debater's profile card shows their half of the thumbnail
+#
+# Story: On the profile card of a debater, the cover shows the same half of the thumbnail as their column on the
+# face-off card: the first guest the left half, the second the right half, swapped with `swap`. An interview with one
+# guest keeps the whole thumbnail.
+
+def test_profile_card_halves(monkeypatch):
+    monkeypatch.setattr(server, "thumbnail", lambda video_id, home: "data:image/png;base64,AAAA")
+    halves = lambda data, name, swap=False: set(re.findall(r'class="[^"]*half (left|right)"',
+                                                           server.summary_page(data, name, swap=swap)))
+    debate = FACE_OFF[0]
+    assert halves(debate, "Ana Ruiz (invitada)") == {"left"}, "FAIL halves · the first debater is not on the left"
+    assert halves(debate, "Xoán Pereira (invitado)") == {"right"}, "FAIL halves · the second debater is not on the right"
+    assert halves(debate, "Ana Ruiz (invitada)", swap=True) == {"right"}, "FAIL halves · swap does not change the half"
+    assert halves(MARTA[0], "Marta Ibarra (invitada)") == set(), "FAIL halves · an interview card lost its whole thumbnail"

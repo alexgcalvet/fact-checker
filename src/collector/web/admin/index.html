@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Review uploads</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' role='img' aria-label='DeFacto'%3E%3Crect width='32' height='32' rx='6.4' fill='%23000'/%3E%3Cg transform='translate(9.22 27.20) scale(0.2240)'%3E%3Cpath d='M23.5 0L60.5 0L60.5 -4L59.6 -4.02L58.78 -4.08L58.01 -4.18L57.32 -4.33L56.69 -4.51L56.12 -4.73L55.62 -5L55.19 -5.31L54.83 -5.65L54.53 -6.04L54.3 -6.47L54.13 -6.94L54.03 -7.45L54 -8L54 -92L54.03 -92.55L54.13 -93.06L54.3 -93.53L54.53 -93.96L54.83 -94.35L55.19 -94.69L55.62 -95L56.12 -95.27L56.69 -95.49L57.32 -95.67L58.01 -95.82L58.78 -95.92L59.6 -95.98L60.5 -96L60.5 -100L0 -100L0 -76.8L5 -76.8L5.04 -78.18L5.16 -79.45L5.37 -80.63L5.65 -81.7L6.02 -82.67L6.47 -83.53L7 -84.3L7.61 -84.96L8.31 -85.52L9.08 -85.98L9.94 -86.34L10.88 -86.6L11.9 -86.75L13 -86.8L30 -86.8L30 -57.1L16.78 -57.1L15.8 -60.3L10.8 -60.3L10.8 -40.7L15.8 -40.7L16.78 -43.9L30 -43.9L30 -8L29.97 -7.45L29.87 -6.94L29.7 -6.47L29.47 -6.04L29.17 -5.65L28.81 -5.31L28.38 -5L27.88 -4.73L27.31 -4.51L26.68 -4.33L25.99 -4.18L25.22 -4.08L24.4 -4.02L23.5 -4Z' fill='%23E6DCC4'/%3E%3Crect x='37.54' y='-81.19' width='8.93' height='26.79' fill='%23D99A2B'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: light dark; --line: #8884; --muted: #888; --serious: #c0392b; }
+  body { font: 15px/1.45 system-ui, sans-serif; margin: 0 auto; padding: 16px; max-width: 1100px; }
+  h1 { font-size: 20px; } h2 { font-size: 17px; margin-top: 28px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; font-size: 13px; color: var(--muted); }
+  tbody tr.row { cursor: pointer; } tbody tr.row:hover, tr.open { background: #8881; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .serious { color: var(--serious); font-weight: 600; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .actions { display: flex; gap: 8px; margin: 12px 0; }
+  button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); cursor: pointer; }
+  button.approve { background: #1e8449; color: #fff; border-color: #1e8449; }
+  button.reject { background: transparent; color: var(--serious); border-color: var(--serious); }
+  button.small { padding: 2px 10px; font-size: 13px; }
+  tr.hidden-flag td { opacity: .45; } tr.hidden-flag td:last-child { opacity: 1; }
+  .wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Pending uploads</h1>
+<p id="status" class="muted">Loading…</p>
+<div class="wrap">
+  <table id="list" hidden>
+    <thead><tr>
+      <th>Video</th><th>Lang</th><th>Type</th><th>Models</th><th class="num">Cost</th>
+      <th class="num">Flags</th><th class="num">Serious</th><th>Uploader</th><th>Received</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<h2>Approved videos</h2>
+<p id="approved-status" class="muted">Loading…</p>
+<div class="wrap">
+  <table id="approved" hidden>
+    <thead><tr>
+      <th>Video</th><th>Lang</th><th>Title</th><th>Type</th><th class="num">Flags</th><th class="num">Hidden</th><th>Public</th><th>Received</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<section id="upload" hidden>
+  <h2 id="upload-title"></h2>
+  <!-- What each guest's profile card will count: it goes public with the flags. -->
+  <p class="muted" id="guests"></p>
+  <div class="actions" id="decide">
+    <button class="approve" id="approve">Approve</button>
+    <button class="reject" id="reject">Reject</button>
+  </div>
+  <!-- Off: the public API and the web skip the video; this page still lists it. -->
+  <label class="actions" id="power" hidden><input type="checkbox" id="active"> Visible en la web</label>
+  <!-- A debate of two guests: the first guest's face is the thumbnail's left half, unless the owner swaps them. -->
+  <label class="actions" id="faces" hidden><input type="checkbox" id="swap"> Caras: intercambiar izquierda/derecha</label>
+  <!-- The display title: it wins over the clean title computed from the raw one; empty gives the clean title back. -->
+  <form class="actions" id="naming" hidden><label>Título <input id="own-title" size="60" maxlength="200"></label>
+    <button class="small" type="submit">Guardar</button></form>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Second</th><th>Type</th><th>Label</th><th>Quote</th><th>Reason</th><th>Sources</th><th>Severity</th><th>Public</th></tr></thead>
+      <tbody id="flags"></tbody>
+    </table>
+  </div>
+</section>
+<h2>Visits</h2>
+<p id="visits-status" class="muted">Loading…</p>
+<div class="wrap">
+  <table id="visits" hidden>
+    <thead><tr><th>Day</th><th>Video</th><th>Language</th><th>Visits</th><th>Seeks</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<h2>Marks</h2>
+<p id="marks-status" class="muted">Loading…</p>
+<div class="wrap">
+  <table id="marks" hidden>
+    <thead><tr>
+      <th>Received</th><th>Video</th><th>Second</th><th>Type</th><th>Label</th><th>Quote</th><th>Verdict</th><th>Reason</th>
+      <th>Source</th><th>Id</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<h2>Feedback</h2>
+<p id="feedback-status" class="muted">Loading…</p>
+<div class="wrap">
+  <table id="feedback" hidden>
+    <thead><tr>
+      <th>Received</th><th>Kind</th><th>Video</th><th>Flag</th><th>Version</th><th>Part</th><th>Rule</th><th>Quote</th>
+      <th>Text</th><th>Id</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<script>
+// The page's calls are /admin/pending, /admin/pending/<video_id>[/approve|reject]?lang=&install=&at=, /admin/approved,
+// /admin/approved/<video_id>?lang=, /admin/hidden/<video_id>?lang=, /admin/analyses/<video_id>/flags/<flag_id>/hide|show
+// ?lang=, /admin/videos/<video_id>/faces/swap|keep, /admin/videos/<video_id>/active/on|off, /admin/visits, /admin/marks and /admin/feedback, behind Cloudflare
+// Access.
+const $ = (id) => document.getElementById(id);
+const cell = (tr, text, cls) => {
+  const td = tr.insertCell();
+  td.textContent = text ?? "";
+  if (cls) td.className = cls;
+  return td;
+};
+const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const models = (readers) => Object.entries(readers ?? {}).map(([role, r]) => `${role} ${r?.model ?? "?"}`).join(", ");
+let current = null;
+
+async function call(path, method = "GET", body) {
+  const res = await fetch(path, body === undefined ? { method }
+    : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
+  return res.json();
+}
+
+const videoCell = (tr, id) => {
+  const link = document.createElement("a");
+  link.href = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = id;
+  link.onclick = (e) => e.stopPropagation();
+  cell(tr, "").append(link);
+};
+
+async function list() {
+  const { rows } = await call("/admin/pending");
+  const body = $("list").tBodies[0];
+  body.replaceChildren();
+  for (const r of rows) {
+    const tr = body.insertRow();
+    tr.className = "row";
+    videoCell(tr, r.video_id);
+    cell(tr, r.lang);
+    cell(tr, r.type);
+    cell(tr, models(r.readers));
+    cell(tr, r.cost_usd == null ? "–" : `${r.cost_usd.toFixed(2)} $`, "num");
+    cell(tr, r.flags, "num");
+    cell(tr, r.serious, r.serious ? "num serious" : "num");
+    cell(tr, r.install_id.slice(0, 8), "muted");
+    cell(tr, new Date(r.received_at).toLocaleString(), "muted");
+    tr.onclick = () => open(r, tr, "pending").catch(show);
+  }
+  $("list").hidden = !rows.length;
+  $("status").textContent = rows.length ? `${rows.length} pending` : "Nothing pending.";
+}
+
+// The approved videos: open one to hide a bad flag or show it again.
+async function approved() {
+  const { rows } = await call("/admin/approved");
+  const body = $("approved").tBodies[0];
+  body.replaceChildren();
+  for (const r of rows) {
+    const tr = body.insertRow();
+    tr.className = "row";
+    videoCell(tr, r.video_id);
+    cell(tr, r.lang);
+    cell(tr, r.title);
+    cell(tr, r.type);
+    cell(tr, r.flags, "num");
+    cell(tr, r.hidden || "", "num");
+    cell(tr, r.active ? "on" : "off", r.active ? "muted" : "serious");
+    cell(tr, new Date(r.received_at).toLocaleString(), "muted");
+    tr.onclick = () => open(r, tr, "approved").catch(showApproved);
+  }
+  $("approved").hidden = !rows.length;
+  $("approved-status").textContent = rows.length ? `${rows.length} approved` : "Nothing approved.";
+}
+
+// The latest marks, newest first: the source is `web` from the web app, else the tester's helper version.
+// Visits of each video page and jumps to a flag's moment, per day and language, newest day first.
+async function visits() {
+  const { rows } = await call("/admin/visits");
+  const body = $("visits").tBodies[0];
+  body.replaceChildren();
+  for (const v of rows) {
+    const tr = body.insertRow();
+    cell(tr, v.day);
+    videoCell(tr, v.video_id);
+    cell(tr, v.lang);
+    cell(tr, String(v.visits));
+    cell(tr, String(v.seeks));
+  }
+  $("visits").hidden = !rows.length;
+  $("visits-status").textContent = rows.length ? "Visits and seeks (jumps to a flag) per day" : "No visits yet.";
+}
+
+async function marks() {
+  const { rows } = await call("/admin/marks");
+  const body = $("marks").tBodies[0];
+  body.replaceChildren();
+  for (const m of rows) {
+    const tr = body.insertRow();
+    cell(tr, new Date(m.received_at).toLocaleString(), "muted");
+    cell(tr, m.video_id);
+    cell(tr, clock(m.t), "num");
+    cell(tr, m.type);
+    cell(tr, m.label);
+    cell(tr, m.quote);
+    cell(tr, m.verdict, m.verdict === "unfair" ? "serious" : "");
+    cell(tr, m.reason);
+    cell(tr, m.helper_version === "web" ? "web" : `helper ${m.helper_version}`);
+    cell(tr, m.install_id.slice(0, 8), "muted");
+  }
+  $("marks").hidden = !rows.length;
+  $("marks-status").textContent = rows.length ? `The latest ${rows.length} marks` : "No marks yet.";
+}
+
+// The latest feedback on the method, newest first, with what each item points to: a flag and its rule, or a part, a
+// rule and a quote of a prompts version.
+async function feedback() {
+  const { rows } = await call("/admin/feedback");
+  const body = $("feedback").tBodies[0];
+  body.replaceChildren();
+  for (const f of rows) {
+    const tr = body.insertRow();
+    cell(tr, new Date(f.received_at).toLocaleString(), "muted");
+    cell(tr, f.kind);
+    cell(tr, f.video_id);
+    cell(tr, f.flag_id);
+    cell(tr, f.version, "muted");
+    cell(tr, f.component);
+    cell(tr, f.rule);
+    cell(tr, f.quote ? `«${f.quote}»` : "");
+    cell(tr, f.text);
+    cell(tr, f.install_id.slice(0, 8), "muted");
+  }
+  $("feedback").hidden = !rows.length;
+  $("feedback-status").textContent = rows.length ? `The latest ${rows.length} items` : "No feedback yet.";
+}
+
+// An upload or an approved analysis, with a Hide or Show button on each flag: a hidden flag is never served.
+async function open(row, tr, kind) {
+  document.querySelectorAll("tr.open").forEach((el) => el.classList.remove("open"));
+  tr.classList.add("open");
+  current = kind === "pending" ? row : null;
+  const video = encodeURIComponent(row.video_id);
+  const [analysis, { flags: hidden }] = await Promise.all([
+    call(`/admin/${kind}/${video}?lang=${row.lang}${kind === "pending" ? which(row) : ""}`),
+    call(`/admin/hidden/${video}?lang=${row.lang}`),
+  ]);
+  const off = new Set(hidden);
+  $("decide").hidden = kind !== "pending";
+  // The switch of a debate's halves, for every language of the video.
+  $("faces").hidden = kind !== "approved" || row.guests !== 2;
+  $("swap").checked = Boolean(row.swap);
+  $("power").hidden = kind !== "approved";
+  $("active").checked = row.active !== false;
+  $("active").onchange = () => {
+    const action = $("active").checked ? "on" : "off";
+    call(`/admin/videos/${video}/active/${action}`, "POST").then(approved).catch((e) => {
+      $("active").checked = !$("active").checked;
+      showApproved(e);
+    });
+  };
+  $("naming").hidden = kind !== "approved";
+  $("own-title").value = row.own_title ?? "";
+  $("own-title").placeholder = analysis.title ?? "";
+  $("naming").onsubmit = (e) => {
+    e.preventDefault();
+    call(`/admin/videos/${video}/title`, "POST", { title: $("own-title").value }).then(approved).catch(showApproved);
+  };
+  $("swap").onchange = () => {
+    const action = $("swap").checked ? "swap" : "keep";
+    call(`/admin/videos/${video}/faces/${action}`, "POST").then(approved).catch((e) => {
+      $("swap").checked = !$("swap").checked;
+      showApproved(e);
+    });
+  };
+  $("upload-title").textContent = [analysis.title ?? row.video_id, analysis.channel, row.lang, row.type, models(analysis.readers)]
+    .filter(Boolean).join(" · ");
+  $("guests").textContent = Object.entries(analysis.summary ?? {}).map(([name, t]) => {
+    const by = (v) => Object.values(t.flags).filter((f) => f.verdict === v).length;
+    return `${name}: ${t.checked} checked, ${by("false")} false, ${by("misleading")} misleading, ` +
+      `${by("nitpick")} nitpicks, ${t.asked} asked`;
+  }).join(" · ");
+  const body = $("flags");
+  body.replaceChildren();
+  for (const f of analysis.flags) {
+    const tr = body.insertRow();
+    const severity = f.judge?.verdict === "nitpick" ? "nitpick" : f.judge?.severity ?? "–";
+    cell(tr, clock(f.t), "num");
+    cell(tr, f.type);
+    cell(tr, f.label);
+    cell(tr, f.quote);
+    cell(tr, f.reason);
+    const sources = cell(tr, "");
+    for (const s of f.sources ?? []) {
+      const link = Object.assign(document.createElement("a"),
+        { href: s.url, target: "_blank", rel: "noopener", textContent: `${s.publisher} ${s.date ?? ""}` });
+      sources.append(link, document.createElement("br"));
+    }
+    cell(tr, severity, severity === "serious" ? "serious" : "");
+    const button = document.createElement("button");
+    button.className = "small";
+    const mark = () => {
+      tr.classList.toggle("hidden-flag", off.has(f.id));
+      button.textContent = off.has(f.id) ? "Show" : "Hide";
+    };
+    button.onclick = () => {
+      const action = off.has(f.id) ? "show" : "hide";
+      call(`/admin/analyses/${video}/flags/${encodeURIComponent(f.id)}/${action}?lang=${row.lang}`, "POST").then(() => {
+        if (action === "hide") off.add(f.id); else off.delete(f.id);
+        mark();
+        return approved();
+      }).catch(show);
+    };
+    mark();
+    cell(tr, "").append(button);
+  }
+  $("upload").hidden = false;
+}
+
+// The one upload a pending row names.
+const which = (row) => `&install=${encodeURIComponent(row.install_id)}&at=${encodeURIComponent(row.received_at)}`;
+
+async function decide(action) {
+  if (!current) return;
+  if (action === "reject" && !confirm(`Reject and delete ${current.video_id} (${current.lang})?`)) return;
+  await call(`/admin/pending/${encodeURIComponent(current.video_id)}/${action}?lang=${current.lang}${which(current)}`,
+    "POST");
+  current = null;
+  $("upload").hidden = true;
+  await Promise.all([list(), approved()]);
+}
+
+$("approve").onclick = () => decide("approve").catch(show);
+$("reject").onclick = () => decide("reject").catch(show);
+const show = (e) => { $("status").textContent = e.message; };
+const showApproved = (e) => { $("approved-status").textContent = e.message; };
+list().catch(show);
+approved().catch(showApproved);
+visits().catch((e) => { $("visits-status").textContent = e.message; });
+marks().catch((e) => { $("marks-status").textContent = e.message; });
+feedback().catch((e) => { $("feedback-status").textContent = e.message; });
+</script>
+</body>
+</html>

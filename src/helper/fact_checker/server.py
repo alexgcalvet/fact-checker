@@ -95,10 +95,13 @@ KEY_ROW = """<form method="post" action="/keys?lang={lang}" style="margin-bottom
 </form>"""
 
 
-def summary_page(data: dict, name: str, series: str | None = None) -> str:
-    """The HTML page of the card of `name`, from the flag file with marks."""
+def summary_page(data: dict, name: str, series: str | None = None, swap: bool = False) -> str:
+    """The HTML page of the card of `name`, from the flag file with marks. In a debate (two guests) the card shows
+    the debater's half of the thumbnail, as on the face-off card: the first guest the left half, unless `swap`."""
+    guests = summary.guests(data)
+    half = ("left", "right")[guests.index(name) ^ swap] if len(guests) == 2 and name in guests else None
     return summary.page(summary.card(data, name, series), SUMMARY_TEMPLATE.read_text(),
-                        thumbnail(data["video_id"], default_home()))
+                        thumbnail(data["video_id"], default_home()), half)
 
 
 def speech_cli() -> Path | None:
@@ -208,8 +211,8 @@ def provider_llm(home: Path, name: str, **options):
     if settings["provider"] in API:
         options |= {"key": secret(home, settings["key_env"]), "key_env": settings["key_env"],
                     "base_url": settings["base_url"]}
-    else:
-        options |= {"workdir": home}
+    else:  # a reading led by a prompt injection could print a key, and claude -p bills its key ahead of the plan
+        options |= {"workdir": home, "keys": tuple(read_env(home))}
     adapter = {"claude": ClaudeCLI, "codex": CodexCLI, "anthropic": AnthropicAPI, "openai": OpenAIAPI,
                "chat": ChatAPI}[settings["provider"]]
     return adapter(model=settings["model"], **options)
@@ -322,7 +325,7 @@ def run_analysis(video_id: str, from_t: float, *, transcript, llm, home: Path, f
     store.save(data | {"lang": reader, "spoken": spoken, "published_at": tr.published_at, "speakers": tr.speakers,
                        "title": tr.title, "channel": tr.channel, "duration": tr.duration, "cost_usd": round(cost[0], 6)})
 
-    saving = threading.Lock()  # the parts and the voices both rewrite the flag file
+    saving = store.lock  # the parts, the voices and the person's roles all rewrite the flag file
     heard = threading.Event()
 
     def name_voices(flags) -> None:
@@ -622,10 +625,12 @@ def handler(helper: Helper):
                 return self._reply(404, {"error": "not analysed"})
             guests = summary.guests(data)
             series = query.get("series", [""])[0].strip()[:80]
+            swap = query.get("swap", [""])[0] == "1"
             if not kind:
                 words = SHARE_TEXTS[data.get("lang") or "es"]
                 cards = "".join(SHARE_CARD.format(
-                    src=html.escape("summary.png?" + urlencode({"person": g} | ({"series": series} if series else {}))),
+                    src=html.escape("summary.png?" + urlencode({"person": g} | ({"series": series} if series else {})
+                                                            | ({"swap": "1"} if swap else {}))),
                     alt=html.escape(summary.alt_text(summary.card(data, g, series))), copy=words["copy"])
                     for g in guests)
                 page = SHARE_PAGE.format(lang=data.get("lang") or "es", cards=cards, series=html.escape(series),
@@ -636,7 +641,7 @@ def handler(helper: Helper):
             if name not in guests:
                 return self._reply(404, {"error": "unknown person"})
             if kind == ".png":
-                return self._send(screenshot(summary_page(data, name, series)), "image/png")
+                return self._send(screenshot(summary_page(data, name, series, swap)), "image/png")
             self._send(summary.alt_text(summary.card(data, name, series)).encode(), "text/plain; charset=utf-8")
 
         def _health(self) -> None:
@@ -654,8 +659,6 @@ def handler(helper: Helper):
             field to paste it. Only the helper's own address reaches it (no DNS rebinding), and a key is kept only
             from the page itself (Origin). No value is ever sent back."""
             own = f"127.0.0.1:{self.server.server_address[1]}"
-            if self.headers.get("Host") != own:
-                return self._reply(403, {"error": "forbidden host"})
             lang = parse_qs(urlparse(self.path).query).get("lang", ["es"])[0]
             lang = lang if lang in KEY_TEXTS else "es"
             names = [*key_names(helper.home), *OPTIONAL_KEYS]
@@ -686,7 +689,17 @@ def handler(helper: Helper):
             self.end_headers()
             self.wfile.write(raw)
 
+        def _foreign(self) -> bool:
+            """A request through another host name (DNS rebinding) or from a web page. Only the extension, the
+            helper's own pages and local programs (no Origin) reach the helper: any site can post to 127.0.0.1."""
+            own = f"127.0.0.1:{self.server.server_address[1]}"
+            origin = self.headers.get("Origin")
+            return self.headers.get("Host") != own or not (
+                origin is None or origin.startswith("chrome-extension://") or origin == f"http://{own}")
+
         def do_GET(self):
+            if self._foreign():
+                return self._reply(403, {"error": "forbidden"})
             if urlparse(self.path).path == "/health":
                 return self._health()
             if urlparse(self.path).path == "/keys":
@@ -722,10 +735,20 @@ def handler(helper: Helper):
             helper.store.save(shared | {"source": "shared"})
             return self._flag_file(video_id)
 
+        def _json(self) -> dict:
+            """The request's JSON object, at most 10 kB; ValueError otherwise."""
+            length = int(self.headers.get("Content-Length", 0))
+            if not 0 <= length <= 10_000:
+                raise ValueError("bad length")
+            body = json.loads(self.rfile.read(length))
+            if not isinstance(body, dict):
+                raise ValueError("not an object")
+            return body
+
         def _mark(self, video_id: str) -> None:
             try:
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            except (ValueError, json.JSONDecodeError):
+                body = self._json()
+            except ValueError:
                 return self._reply(400, {"error": "bad json"})
             if body.get("verdict") not in ("correct", "unfair"):
                 return self._reply(400, {"error": "bad verdict"})
@@ -742,26 +765,27 @@ def handler(helper: Helper):
         def _people(self, video_id: str) -> None:
             """The person sets the role of one speaker; a later naming of the voices keeps it."""
             try:
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            except (ValueError, json.JSONDecodeError):
+                body = self._json()
+            except ValueError:
                 return self._reply(400, {"error": "bad json"})
-            data = helper.store.load(video_id)
-            if not data:
-                return self._reply(404, {"error": "not analysed"})
-            name = body.get("name")
-            if name not in data.get("speakers", {}).values():
-                return self._reply(400, {"error": "unknown speaker"})
-            if body.get("role") not in ("host", "guest"):
-                return self._reply(400, {"error": "bad role"})
-            people = data.get("people") or {}
-            people[name] = people.get(name, {"person": name}) | {"role": body["role"], "set_by": "person"}
-            helper.store.save(data | {"people": people})
+            with helper.store.lock:  # an analysis may be saving this file
+                data = helper.store.load(video_id)
+                if not data:
+                    return self._reply(404, {"error": "not analysed"})
+                name = body.get("name")
+                if name not in data.get("speakers", {}).values():
+                    return self._reply(400, {"error": "unknown speaker"})
+                if body.get("role") not in ("host", "guest"):
+                    return self._reply(400, {"error": "bad role"})
+                people = data.get("people") or {}
+                people[name] = people.get(name, {"person": name}) | {"role": body["role"], "set_by": "person"}
+                helper.store.save(data | {"people": people})
             self._reply(200, {"people": people})
 
         def _share(self) -> None:
             try:
-                on = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))["share"]
-            except (ValueError, KeyError, TypeError):
+                on = self._json()["share"]
+            except (ValueError, KeyError):
                 return self._reply(400, {"error": "bad json"})
             if not isinstance(on, bool):
                 return self._reply(400, {"error": "bad share"})
@@ -769,6 +793,8 @@ def handler(helper: Helper):
             self._reply(200, {"share": on})
 
         def do_POST(self):
+            if self._foreign():
+                return self._reply(403, {"error": "forbidden"})
             if urlparse(self.path).path == "/share":
                 return self._share()
             if urlparse(self.path).path == "/keys":

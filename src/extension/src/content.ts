@@ -7,9 +7,8 @@ const POLL_MS = 3000;
 
 type Reply = { ok: boolean; data?: FlagFile | null; down?: boolean };
 
-let flags: FlagFile | null = null;
+// Takes down the current video's layer and stops its polls; set by each start.
 let unmount: (() => void) | null = null;
-let poll: number | undefined;
 
 // After the extension is reloaded, this old copy of the script stays in open tabs with no extension behind it.
 // It then stops polling, removes its layer and stops following the next video; the reloaded tab gets a new copy.
@@ -19,7 +18,6 @@ async function send(message: object): Promise<Reply | null> {
     return await chrome.runtime.sendMessage(message);
   } catch (error) {
     if (chrome.runtime?.id && !String(error).includes("context invalidated")) throw error;
-    clearInterval(poll);
     unmount?.();
     unmount = null;
     document.removeEventListener("yt-navigate-finish", start);
@@ -29,12 +27,15 @@ async function send(message: object): Promise<Reply | null> {
 
 async function start() {
   unmount?.();
-  clearInterval(poll);
-  flags = null;
+  unmount = null;
   const videoId = new URLSearchParams(location.search).get("v");
   const player = document.getElementById("movie_player");
   const video = player?.querySelector("video");
   if (location.pathname !== "/watch" || !videoId || !player || !video) return;
+  // An answer for this video that comes after the person moved on is dropped: `alive` is false by then.
+  let flags: FlagFile | null = null;
+  let poll: number | undefined;
+  let alive = true;
 
   // Nothing is shared before the person answers once: the first mark or analysis asks, and the helper keeps the
   // answer as `share_marks`. The mark or the analysis goes after the answer, so the yes covers it.
@@ -78,7 +79,7 @@ async function start() {
     { get: () => shareReply({ kind: "share", videoId }), set: (on) => shareReply({ kind: "set-share", videoId, share: on }) },
     (name, role) => send({ kind: "role", videoId, name, role }),
     () => send({ kind: "keys", videoId, lang: lang() }));
-  unmount = () => { unmountPanel(); overlay.unmount(); };
+  unmount = () => { alive = false; clearInterval(poll); unmountPanel(); overlay.unmount(); };
   // The service worker answers `down` when nothing listens on the helper's port: not installed, or not running.
   const notice = div("fc-down fc-s");
   notice.style.cssText = "position:absolute;left:12px;top:12px;max-width:380px;padding:10px 12px;border-radius:10px;" +
@@ -97,12 +98,17 @@ async function start() {
   // in that language.
   const refresh = async () => {
     const res = await send({ kind: "flags", videoId, at: video.currentTime, lang: lang() });
+    if (!alive) return null;
     down(res);
-    if (res?.ok && res.data) flags = res.data;
+    if (res?.ok && res.data) {
+      flags = res.data;
+      overlay.layer.dispatchEvent(new Event("fc-flags")); // a paused video fires no timeupdate
+    }
     if (flags && flags.status !== "running") clearInterval(poll);
     return res;
   };
   const follow = () => {
+    clearInterval(poll);
     poll = setInterval(refresh, POLL_MS);
     refresh();
   };
@@ -124,7 +130,8 @@ async function start() {
   // A first look, again every few seconds while the helper is down.
   // An analysis spends Claude tool calls, so it starts only when the person asks; a known video costs nothing.
   const look = async () => {
-    if (down(await refresh())) return;
+    const res = await refresh();
+    if (!alive || down(res)) return;
     clearInterval(poll);
     const known = flags as FlagFile | null;
     // An analysis stopped by an error can be asked again; one that spent its budget cannot.
@@ -146,7 +153,9 @@ async function start() {
     spend.remove();
     await consent();
     // The reasons of the flags come in the interface language.
-    if (down(await send({ kind: "analyze", videoId, from: video.currentTime, lang: lang() }))) {
+    const res = await send({ kind: "analyze", videoId, from: video.currentTime, lang: lang() });
+    if (!alive) return;
+    if (down(res)) {
       poll = setInterval(look, POLL_MS);
       return;
     }

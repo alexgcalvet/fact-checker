@@ -25,6 +25,15 @@ h1{left:72px;right:72px;top:196px;font:400 ${name_size}px/0.95 'Newsreader',seri
 .plate{left:0;top:0;width:1080px;height:381px;overflow:hidden;clip-path:polygon(0 0,1080px 0,1080px 360px,660px 360px,640px 380px,0 380px)}
 .plate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 35%;display:block}
 .p-dim{filter:brightness(.62) saturate(.85)}
+/* A debater's card shows their half of the thumbnail whole, on the right of the plate, at the plate's height;
+   the left half is mirrored so both debaters face their name. A fade joins it to the dark side. */
+.plate img.half{inset:auto;left:191px;top:-50px;width:889px;height:500px;object-fit:cover}
+.plate img.left{clip-path:inset(0 50% 0 0);transform:scaleX(-1)}
+.plate img.right{clip-path:inset(0 0 0 50%)}
+.p-dim.half{filter:brightness(.8) saturate(.9)}
+.fade{position:absolute;top:0;bottom:0;left:620px;width:180px;background:linear-gradient(to right,#07090D,rgba(7,9,13,0))}
+/* The bottom fade hides the broadcaster's lower third, which a mirrored half would show backwards. */
+.fade-b{position:absolute;left:0;right:0;top:140px;height:241px;background:linear-gradient(to bottom,rgba(7,9,13,0),#07090D 52%)}
 .band{position:absolute;inset:0;clip-path:polygon(1110px 0,1450px 0,1070px 380px,730px 380px)}
 /* The band keeps its colour on a pale or grey thumbnail: a little more saturation and a warm multiply. */
 .band img{filter:saturate(1.35) brightness(.92)}

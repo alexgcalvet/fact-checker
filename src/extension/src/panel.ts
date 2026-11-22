@@ -2,6 +2,7 @@ import { FAMILIES, look, title, TYPE_LOOK, verdict, type Flag, type FlagFile } f
 import { button, confidence, div, dot, fault, icon, lang, minute, onPlayer, setSettings, settings, shows, span, SHOWN_TYPES, words, ZOOM,
   type Settings } from "./overlay";
 import { stopKind, TEXTS } from "./texts";
+import { inOrder, litAt } from "../../shared/panel";
 
 const HEADS_UP = 2;
 const STRIP_MIDDLE = 9; // px from the top of the strip to its track's middle
@@ -143,7 +144,7 @@ export function mountPanel(
   };
   const render = () => {
     const file = getFlags();
-    const flags = (file?.flags ?? []).filter((f) => SHOWN_TYPES.includes(f.type)).sort((a, b) => a.t - b.t);
+    const flags = inOrder((file?.flags ?? []).filter((f) => SHOWN_TYPES.includes(f.type)));
     const analysed = file?.status === "done" ? 100 : Math.min(100, ((file?.analysed_until ?? 0) / video.duration) * 100);
     // Until the first part is read, the tab says so instead of a silent 0.
     const preparing = file?.status === "running" && file.first_flags_s === undefined;
@@ -309,7 +310,7 @@ export function mountPanel(
       mark.style.boxShadow = soon ? `0 0 0 1.5px rgba(10,14,21,.7),0 0 8px 2px ${look(f).mark}` : "";
     }
     // The row at the playhead is the last one already said; the rows before it are past.
-    const at = rows.filter(([f]) => f.t <= now && verdict(f) !== "drop").pop()?.[0];
+    const at = litAt(rows.map(([f]) => f).filter((f) => verdict(f) !== "drop"), now);
     for (const [f, row] of rows) {
       row.classList.toggle("fc-now", f === at);
       row.classList.toggle("fc-past", !!at && f.t < at.t);
@@ -348,6 +349,7 @@ export function mountPanel(
   // A new language redraws the panel with its texts.
   layer.addEventListener("fc-settings", () => { shown(shared); update(); });
   // The flag file grows while the helper analyses, and the duration arrives with the metadata.
+  layer.addEventListener("fc-flags", update);
   for (const type of ["timeupdate", "durationchange"]) video.addEventListener(type, update);
   return () => {
     for (const type of ["timeupdate", "durationchange"]) video.removeEventListener(type, update);
