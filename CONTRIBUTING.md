@@ -1,6 +1,6 @@
 # Contributing to fact-checker
 
-fact-checker flags fallacies, false figures, contradictions and missing context in YouTube videos while they play. Help is welcome. This page says how the project works, where help is needed and how a change gets in.
+fact-checker flags fallacies, false figures, contradictions and missing context in YouTube videos while they play. Help is welcome. This page says how the project works, where help is needed and how a change gets in. The [roadmap](README.md#-roadmap) shows what comes next.
 
 ## The rules that do not change
 
@@ -19,11 +19,12 @@ fact-checker flags fallacies, false figures, contradictions and missing context 
 | **Official data sources** | Lists of reliable statistics offices and sources per country for the figure search. Only Spain is well covered today | economists, data journalists |
 | **Track record analysis** | Detect manipulation the way a professional analyst does: compare what a public figure says with their record (past statements, votes, promises, changes of position), with citable sources | political scientists, analysts, journalists |
 | **Fact-checking method** | Review how claims are picked and checked against professional practice (IFCN principles, verdict scales, ClaimReview) | professional fact-checkers |
-| **Calibration from feedback** | Turn the shared marks into measured improvements: confidence bars per flag type, labels that fail often, rule changes validated on held-out marks | statistics or ML people |
+| **Calibration from feedback** | Turn the shared marks into measured improvements (roadmap v0.4): confidence bars per flag type, labels that fail often, rule changes validated on held-out marks | statistics or ML people |
 | **More languages** | Translate the extension and adapt the prompt rules (Portuguese, French, Catalan, …) | native speakers |
 | **Windows** | The helper runs on macOS and Linux only | Python developers on Windows |
 | **Cheap or local models** | Find which Hugging Face or Ollama models keep the precision through the `chat` provider | ML people |
-| **Live streams** | Analyse live broadcasts, not only recorded videos | developers |
+| **Live streams** | Analyse live broadcasts, not only recorded videos (roadmap v0.3) | developers |
+| **The web** | The public web in `src/web/`: accessibility, phone layouts, translations, the cards a guest can download | front-end developers, designers |
 
 ## How a change gets in
 
@@ -59,7 +60,10 @@ Feedback on flags does not need a PR: marks reach the project through the extens
 | Install | follow [README.md](README.md) or [INSTALL-AGENT.md](INSTALL-AGENT.md) |
 | Helper tests | `cd src/helper && uvx --quiet pytest -c pyproject.toml -q` |
 | Extension and collector | `cd src/extension && npm ci && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run && npm run build` |
+| Web | `cd src/web && npm ci && npx tsc --noEmit && npm run build`, then `bash tests/web/check-brand.sh` |
 
+- **Commit the built files.** The built extension (`src/helper/fact_checker/extension/`) and the built web (`src/collector/web/app/`) are in the repo. Run the build before you commit: CI fails if either differs from a fresh build.
+- **Web colours come from the brand tokens** (`src/web/brand/tokens.css`). CI fails on a hex colour in `src/web/src`.
 - Tests never call a real model or a real service. They use fakes on `PATH` and local fake servers.
 - Find a test by the part it checks:
 
@@ -67,7 +71,8 @@ Feedback on flags does not need a PR: marks reach the project through the extens
 |---|---|
 | Helper | `tests/helper/test_<part>.py`: reading, fact_check, judge, transcript, providers, cost, setup, sharing, summary, server, eval |
 | Extension | `tests/extension/<screen>.test.ts`: card, panel, strip, settings, start, bundle |
-| Collector | `tests/collector/<route>.test.ts`: marks, analyses |
+| Collector | `tests/collector/<route>.test.ts`: marks, analyses, the public API, the review page |
+| Web | `tests/web/<screen>.test.ts`: list, viewer, profile, compare, how it works |
 | External systems | `tests/contracts/`: one contract test each; SKIP without credentials |
 | Shared fakes and helpers | `tests/support/` (no test); recorded answers in `tests/fakes/` |
 | Open slices | `tests/acceptance/` |
