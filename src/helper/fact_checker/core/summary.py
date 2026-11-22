@@ -99,41 +99,79 @@ def _source(flag: dict) -> str:
     return re.split(r"\s+[(–—-]\s*", flag["sources"][0]["publisher"])[0] if flag.get("sources") else ""
 
 
+def _level(flag: dict) -> str | None:
+    return (flag.get("judge") or {}).get("severity")
+
+
+def _kind(flag: dict) -> str:
+    return WRONG[flag["label"]] if flag["type"] == "inaccuracy" else "rhetoric"
+
+
+def tally(data: dict, name: str) -> dict:
+    """What each flag of `name` adds to the card, keyed by flag id: `{checked, asked, flags: {<id>: {verdict,
+    severity, device, question}}, gravest: [<id>…]}`. A flag that adds to nothing is left out, so dropping a flag's id
+    counts it as an `unfair` mark does: nowhere, its claim still checked. `gravest` lists every candidate in order.
+
+    The card counts what the judge keeps, with no review needed (its footer says so); a flag the judge has not ruled
+    on counts too. The mark wins, as on the player: a flag marked correct counts under its found verdict, whatever the
+    judge ruled, and one marked unfair counts nowhere. A puntualización is a figure the judge ruled a nitpick and the
+    person did not mark. The counts of checked claims and questions asked come from the file's `claims` and
+    `questions`. A device is its label id, or the closest one the card names."""
+    labels = TEXTS["es"]["labels"]
+    mine = [f for f in data["flags"] if speaker(f) == name]
+    flags = {}
+    for f in mine:
+        verdict = (f.get("judge") or {}).get("verdict", "keep")
+        kept = f.get("mark") == "correct" or "mark" not in f and verdict == "keep"
+        nitpick = "mark" not in f and f["type"] == "inaccuracy" and verdict == "nitpick"
+        wrong = kept and f["type"] == "inaccuracy" and f["label"] in WRONG
+        device = kept and f["type"] in DEVICES
+        rated = (wrong or device) and _level(f) in SEVERITIES
+        question = kept and f["type"] == "question" and f["label"] in ("dodged", "partial")
+        if wrong or nitpick or device or question:
+            flags[f["id"]] = {
+                "verdict": "nitpick" if nitpick else WRONG[f["label"]] if wrong else None,
+                "severity": _level(f) if rated else None,
+                "device": (f["label"] if f["label"] in labels or f.get("closest") not in labels else f["closest"])
+                if device else None,
+                "question": f["label"] if question else None,
+            }
+    figures = sum(t["verdict"] is not None for t in flags.values())
+    answers = sum(t["question"] is not None for t in flags.values())
+    # The gravest put false figures before misleading ones, then rhetoric, at each level.
+    gravest = sorted([f for f in mine if f["id"] in flags and (flags[f["id"]]["verdict"] in ("false", "misleading")
+                                                             or flags[f["id"]]["device"]
+                                                             and flags[f["id"]]["severity"] == "serious")],
+                     key=lambda f: (SEVERITIES.index(_level(f)) if _level(f) in SEVERITIES else 3,
+                                    ("false", "misleading", "rhetoric").index(_kind(f)), -f["confidence"], f["t"]))
+    return {
+        # An analysis from before the counts has none: the reviewed flags are then the least that was checked.
+        "checked": max((data.get("claims") or {}).get(name, 0), figures),
+        "asked": max((data.get("questions") or {}).get(name, 0), answers),
+        "flags": flags,
+        "gravest": [f["id"] for f in gravest],
+    }
+
+
 def card(data: dict, name: str, series: str | None = None) -> dict:
-    """The content of the card of `name` from the flag file with marks. The card counts what the judge keeps, with no
-    review needed (its footer says so); a flag the judge has not ruled on counts too. The mark wins, as on the
-    player: a flag marked correct counts under its found verdict, whatever the judge ruled, and one marked unfair
-    counts nowhere. A puntualización is a figure the judge ruled a nitpick and the person did not mark. The counts of
-    checked claims and questions asked come from the file's `claims` and `questions`."""
+    """The content of the card of `name` from the flag file with marks, counted from its `tally`."""
     lang = data.get("lang") or "es"
     words = TEXTS[lang]
-    mine = [f for f in data["flags"] if speaker(f) == name]
-    kept = [f for f in mine if f.get("mark") == "correct"
-            or "mark" not in f and (f.get("judge") or {}).get("verdict", "keep") == "keep"]
-    wrong = [f for f in kept if f["type"] == "inaccuracy" and f["label"] in WRONG]
-    small = [f for f in mine if "mark" not in f and f["type"] == "inaccuracy"
-             and (f.get("judge") or {}).get("verdict") == "nitpick"]
-    level = lambda f: (f.get("judge") or {}).get("severity")
-    # An analysis from before the counts has none: the reviewed flags are then the least that was checked.
-    checked = max((data.get("claims") or {}).get(name, 0), len(wrong) + len(small))
-    dodged = sum(f["type"] == "question" and f["label"] == "dodged" for f in kept)
-    partial = sum(f["type"] == "question" and f["label"] == "partial" for f in kept)
-    kinds = Counter(WRONG[f["label"]] for f in wrong)
-    # Severity covers every kept flag but questions; the gravest put false figures before misleading ones, then
-    # rhetoric, at each level.
-    rated = [f for f in kept if f["type"] == "inaccuracy" and f["label"] in WRONG or f["type"] in DEVICES]
-    kind = lambda f: WRONG[f["label"]] if f["type"] == "inaccuracy" else "rhetoric"
+    t = tally(data, name)
+    counts = list(t["flags"].values())
+    checked = t["checked"]
+    kinds = Counter(c["verdict"] for c in counts)
+    wrong = kinds["false"] + kinds["misleading"]
     devices, grave = Counter(), Counter()
-    for f in kept:
-        if f["type"] in DEVICES:
-            label = words["labels"].get(f["label"]) or words["labels"].get(f.get("closest") or "", f["label"])
+    for c in counts:
+        if c["device"]:
+            label = words["labels"].get(c["device"], c["device"])
             devices[label] += 1
-            grave[label] += level(f) == "serious"
+            grave[label] += c["severity"] == "serious"
     person = (data.get("people") or {}).get(name, {})
     spoken, duration = person.get("spoken_s"), data.get("duration")
-    gravest = sorted([f for f in rated if f in wrong or level(f) == "serious"],
-                     key=lambda f: (SEVERITIES.index(level(f)) if level(f) in SEVERITIES else 3,
-                                    ("false", "misleading", "rhetoric").index(kind(f)), -f["confidence"], f["t"]))[:2]
+    by_id = {f["id"]: f for f in data["flags"] if speaker(f) == name}
+    gravest = [by_id[i] for i in t["gravest"][:2]]
     return {
         "lang": lang,
         "name": person.get("person") or re.sub(r"\s*\(.*\)$", "", name),
@@ -144,19 +182,19 @@ def card(data: dict, name: str, series: str | None = None) -> dict:
         else _length(duration) if duration else "",
         "series": series or "",
         "spoken": spoken,
-        "wrong": len(wrong),
+        "wrong": wrong,
         "checked": checked,
-        "verdicts": {"false": kinds["false"], "misleading": kinds["misleading"], "nitpick": len(small),
-                     "correct": checked - len(wrong) - len(small)},
-        "severity": {s: sum(level(f) == s for f in rated) for s in SEVERITIES},
+        "verdicts": {"false": kinds["false"], "misleading": kinds["misleading"], "nitpick": kinds["nitpick"],
+                     "correct": checked - wrong - kinds["nitpick"]},
+        "severity": {s: sum(c["severity"] == s for c in counts) for s in SEVERITIES},
         # Ties go to the device with a serious flag.
         "devices": sorted(devices.items(), key=lambda x: (-x[1], -grave[x[0]])),
-        "dodged": dodged,
-        "partial": partial,
-        "asked": max((data.get("questions") or {}).get(name, 0), dodged + partial),
-        "gravest": [{"t": f["t"], "quote": f["quote"], "kind": kind(f),
-                     "label": words["labels"].get(f["label"], f["label"]), "severity": level(f),
-                     "correction": (f.get("judge") or {}).get("reason") or f["reason"] if kind(f) == "rhetoric"
+        "dodged": sum(c["question"] == "dodged" for c in counts),
+        "partial": sum(c["question"] == "partial" for c in counts),
+        "asked": t["asked"],
+        "gravest": [{"t": f["t"], "quote": f["quote"], "kind": _kind(f),
+                     "label": words["labels"].get(f["label"], f["label"]), "severity": _level(f),
+                     "correction": (f.get("judge") or {}).get("reason") or f["reason"] if _kind(f) == "rhetoric"
                      else f["reason"], "source": _source(f)} for f in gravest],
     }
 
@@ -214,9 +252,10 @@ LOOKS = {"false": ("fa", "fa", "--red"), "misleading": ("en", "en", "--amber"), 
 ORDER = ("false", "misleading", "nitpick", "correct")  # the verdict bar, false first
 
 
-def page(c: dict, template: str, image: str | None = None) -> str:
+def page(c: dict, template: str, image: str | None = None, half: str | None = None) -> str:
     """The HTML page of the card, 1080×1350. `image` is the video thumbnail as a data URI; without it the plate is a
-    gradient."""
+    gradient. `half`, "left" or "right", shows only that half of the thumbnail, a debater's side, on the right of the plate;
+    the left half is mirrored so the debater faces their name."""
     words = TEXTS[c["lang"]]
     v = c["verdicts"]
     bar = "".join(f'<i style="flex:{v[k]};background:var({LOOKS[k][2]})"></i>' for k in ORDER if v[k])
@@ -236,7 +275,10 @@ def page(c: dict, template: str, image: str | None = None) -> str:
         f'<div class="fix"><b class="c-{g["kind"]}">{escape(_verdict(g, words))}</b> {escape(cut(g["correction"], 92))}'
         + (f' <span class="src">{escape(cut(g["source"], 30))}</span>' if g["source"] else "") + '</div></div>'
         for g in c["gravest"]) or f'<div class="item muted">{words["no_gravest"]}</div>'
-    plate = (f'<img class="p-dim" src="{image}" alt=""><div class="band"><img src="{image}" alt=""></div>'
+    crop = f" half {half}" if half else ""
+    plate = (f'<img class="p-dim{crop}" src="{image}" alt="">' + ('<div class="fade"></div>' if half else '')
+             + f'<div class="band"><img class="{crop.strip()}" src="{image}" alt=""></div>'
+             + ('<div class="fade-b"></div>' if half else '')
              if image else '<div class="p-none"></div>')
     sub = " · ".join(x for x in (f"«{escape(cut(c['title'], 40))}»", escape(c["length"])) if x)
     dodged = _dodged(c, words)
@@ -251,25 +293,25 @@ def page(c: dict, template: str, image: str | None = None) -> str:
 
 
 COMPARE_TEXTS = {
-    "es": {"kicker": ("Comparativa · {} entrevista", "Comparativa · {} entrevistas"), "checked": "datos verificados",
+    "es": {"kicker": ("Debate", "Comparativa · {} entrevistas"), "checked": "datos verificados",
            "line": "{} hablando · {}", "figures": ("{} dato", "{} datos"), "correct": "Datos correctos",
            "per_hour": "Graves por hora", "serious": ("{} grave", "{} graves"), "repeats": "Lo que más repite",
            "times": ("{} vez", "{} veces"), "dodged": "Preguntas esquivadas", "of": "de {}", "nothing": "Nada",
            "percent": "{} %", "legend": {"correct": "Correcto", "nitpick": "Puntualización",
                                          "misleading": "Engañoso", "false": "Falso"},
            "footer": "Detectado con IA · <b>no revisado por humanos</b>",
-           "alt": "Comparativa de {} entrevistas: {}. {} datos verificados.",
+           "alt": ("Debate: {1}. {2} datos verificados.", "Comparativa de {0} entrevistas: {1}. {2} datos verificados."),
            "alt_person": "{}: {}; {} correctos ({}); {} graves por hora ({}); lo que más repite: {}; esquivó {} de {} "
                          "preguntas.",
            "alt_footer": "Detectado con IA, no revisado por humanos."},
-    "en": {"kicker": ("Comparison · {} interview", "Comparison · {} interviews"), "checked": "claims checked",
+    "en": {"kicker": ("Debate", "Comparison · {} interviews"), "checked": "claims checked",
            "line": "{} speaking · {}", "figures": ("{} claim", "{} claims"), "correct": "Correct claims",
            "per_hour": "Serious per hour", "serious": ("{} serious", "{} serious"), "repeats": "Most repeated",
            "times": ("{} time", "{} times"), "dodged": "Questions dodged", "of": "of {}", "nothing": "Nothing",
            "percent": "{}%", "legend": {"correct": "Correct", "nitpick": "Nitpick", "misleading": "Misleading",
                                         "false": "False"},
            "footer": "Detected with AI · <b>not reviewed by a person</b>",
-           "alt": "Comparison of {} interviews: {}. {} claims checked.",
+           "alt": ("Debate: {1}. {2} claims checked.", "Comparison of {0} interviews: {1}. {2} claims checked."),
            "alt_person": "{}: {}; {} correct ({}); {} serious per hour ({}); most repeated: {}; dodged {} of {} "
                          "questions.",
            "alt_footer": "Detected with AI, not reviewed by a person."},
@@ -278,7 +320,7 @@ BAR_ORDER = ("correct", "nitpick", "misleading", "false")  # the board's order o
 
 
 def comparison(interviews: list[dict], series: str | None = None) -> dict:
-    """The content of the comparison card: one column per guest of the flag files with marks, each from the profile
+    """The content of the comparison card: one column per guest of the flag files with marks (one file: a debate), each from the profile
     card of that guest, so a person's numbers read the same on both cards. The same person in several interviews is
     one column: the canonical name drops the role in brackets, and the counts add up."""
     lang = interviews[0].get("lang") or "es"
@@ -339,7 +381,7 @@ def compare_alt(c: dict) -> str:
     """A plain text of the comparison for screen readers, within the 1000 characters of an alt text on X."""
     words = COMPARE_TEXTS[c["lang"]]
     names = dict(TEXTS[c["lang"]]["verdicts"], nitpick=TEXTS[c["lang"]]["nitpicks"])
-    head = words["alt"].format(c["interviews"], _header(c), c["checked"])
+    head = words["alt"][c["interviews"] > 1].format(c["interviews"], _header(c), c["checked"])
     tail = words["alt_footer"]
     room = (1000 - len(head) - len(tail)) // len(c["people"]) - 2
     people = []
@@ -359,19 +401,22 @@ def _header(c: dict) -> str:
     return c["series"] or " · ".join([*(f"«{t}»" for t in c["programmes"]), *([c["months"]] if c["months"] else [])])
 
 
-def compare_page(c: dict, template: str, thumbnails: dict) -> str:
+def compare_page(c: dict, template: str, thumbnails: dict, swap: bool = False) -> str:
     """The HTML page of the comparison, 1080×1350. `thumbnails` maps a video id to its thumbnail as a data URI, or to
-    None for a gradient."""
+    None for a gradient. In a debate the two columns share one thumbnail: the first shows its left half and the second
+    its right half, or the other way round with `swap`."""
     words = COMPARE_TEXTS[c["lang"]]
     columns = []
-    for p in c["people"]:
+    debate = c["interviews"] == 1 and len(c["people"]) == 2
+    for i, p in enumerate(c["people"]):
         col = _column(p, c["lang"])
         image = thumbnails.get(p["video_id"])
+        half = f' class="half {("left", "right")[i ^ swap]}"' if debate else ""
         bar = "".join(f'<i style="flex:{p["verdicts"][k]};background:var({LOOKS[k][2]})"></i>' for k in BAR_ORDER
                       if p["verdicts"][k])
         columns.append(
             f'<div class="col" data-block="col"><div class="thumb">'
-            + (f'<img src="{image}" alt="">' if image else '<div class="p-none"></div>') + '</div>'
+            + (f'<img src="{image}"{half} alt="">' if image else '<div class="p-none"></div>') + '</div>'
             f'<div class="name">{escape(p["name"])}</div><div class="lab line">{"&nbsp;".join(escape(col["line"]).rsplit(" ", 1))}</div>'
             f'<div class="lab head">{words["correct"]}</div><div class="val"><span class="big num">{col["share"]}'
             f'</span></div><div class="bar">{bar}</div>'

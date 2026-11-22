@@ -30,8 +30,9 @@ class Answer(dict):
 class ClaudeCLI:
     """Claude Code headless (`claude -p`) on the person's subscription."""
 
-    def __init__(self, workdir: Path, model: str = "sonnet", timeout: int = 300):
+    def __init__(self, workdir: Path, model: str = "sonnet", timeout: int = 300, keys: tuple = ()):
         self.workdir = Path(workdir)
+        self.keys = keys  # environment variables the reading never gets
         self.model = model
         self.timeout = timeout
 
@@ -66,7 +67,7 @@ class ClaudeCLI:
              "--model", self.model, "--effort", "medium", "--system-prompt", system, "--tools", ",".join(tools),
              "--setting-sources=", *resume, *(["--allowedTools", *tools, "--disallowedTools", "WebFetch"] if tools else [])],
             cwd=self.workdir, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, start_new_session=True, env=os.environ | {"FORCE_PROMPT_CACHING_5M": "1"})
+            text=True, start_new_session=True, env={k: v for k, v in os.environ.items() if k not in self.keys} | {"FORCE_PROMPT_CACHING_5M": "1"})
         try:
             stdout, stderr = proc.communicate(timeout=self.timeout)
         except subprocess.TimeoutExpired:

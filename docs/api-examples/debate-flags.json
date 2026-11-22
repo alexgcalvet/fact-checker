@@ -1,0 +1,256 @@
+{
+  "flags": [
+    {
+      "id": "false-5.0",
+      "t": 45,
+      "speaker": "Ana",
+      "quote": "cifra inventada 5",
+      "type": "inaccuracy",
+      "label": "false",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "keep",
+        "severity": "moderate",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "false-2.0",
+      "t": 75,
+      "speaker": "Luis",
+      "quote": "cifra inventada 2",
+      "type": "inaccuracy",
+      "label": "false",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "keep",
+        "severity": "moderate",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "misleading-8.0",
+      "t": 210,
+      "speaker": "Luis",
+      "quote": "cifra inventada 8",
+      "type": "inaccuracy",
+      "label": "misleading",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "keep",
+        "severity": "serious",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "ad_hominem-4.0",
+      "t": 300,
+      "speaker": "Luis",
+      "quote": "cifra inventada 4",
+      "type": "fallacy",
+      "label": "ad_hominem",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [],
+      "judge": {
+        "verdict": "keep",
+        "severity": "serious",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "ad_hominem-11.0",
+      "t": 420,
+      "speaker": "Ana",
+      "quote": "cifra inventada 11",
+      "type": "fallacy",
+      "label": "ad_hominem",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [],
+      "judge": {
+        "verdict": "keep",
+        "severity": "serious",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "false-1.0",
+      "t": 630,
+      "speaker": "Ana",
+      "quote": "cifra inventada 1",
+      "type": "inaccuracy",
+      "label": "false",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "keep",
+        "severity": "serious",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "false-9.0",
+      "t": 860,
+      "speaker": "Ana",
+      "quote": "cifra inventada 9",
+      "type": "inaccuracy",
+      "label": "false",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "nitpick",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "false-6.0",
+      "t": 980,
+      "speaker": "Luis",
+      "quote": "cifra inventada 6",
+      "type": "inaccuracy",
+      "label": "false",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "nitpick",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "misleading-12.0",
+      "t": 1100,
+      "speaker": "Luis",
+      "quote": "cifra inventada 12",
+      "type": "inaccuracy",
+      "label": "misleading",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "keep",
+        "severity": "minor",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "misleading-3.0",
+      "t": 1210,
+      "speaker": "Ana",
+      "quote": "cifra inventada 3",
+      "type": "inaccuracy",
+      "label": "misleading",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [
+        {
+          "publisher": "Invented Office",
+          "url": "https://example.org/data",
+          "date": "2026-10-01"
+        }
+      ],
+      "judge": {
+        "verdict": "keep",
+        "severity": "minor",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "ad_hominem-7.0",
+      "t": 1500,
+      "speaker": "Ana",
+      "quote": "cifra inventada 7",
+      "type": "fallacy",
+      "label": "ad_hominem",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [],
+      "judge": {
+        "verdict": "keep",
+        "severity": "minor",
+        "reason": "Invented judge reason."
+      }
+    },
+    {
+      "id": "ad_hominem-10.0",
+      "t": 1720,
+      "speaker": "Luis",
+      "quote": "cifra inventada 10",
+      "type": "fallacy",
+      "label": "ad_hominem",
+      "reason": "Invented reason.",
+      "confidence": 0.8,
+      "related": null,
+      "sources": [],
+      "judge": {
+        "verdict": "keep",
+        "severity": "minor",
+        "reason": "Invented judge reason."
+      }
+    }
+  ],
+  "cursor": "12",
+  "live": false
+}

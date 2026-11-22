@@ -1,0 +1,56 @@
+{
+  "videos": [
+    {
+      "video_id": "debate01",
+      "title": "Invented debate",
+      "display_title": "Invented debate",
+      "channel": "Invented Channel",
+      "duration": 3600,
+      "published_at": "2026-11-10",
+      "type": "debate",
+      "guests": [
+        "Ana",
+        "Luis"
+      ],
+      "swap": false,
+      "flags": 12,
+      "langs": [
+        "en",
+        "es"
+      ],
+      "counts": {
+        "falso": 3,
+        "enganoso": 3,
+        "retorica": 4,
+        "evasiva": 0,
+        "puntualizacion": 2,
+        "contexto": 0
+      }
+    },
+    {
+      "video_id": "intervw1",
+      "title": "Entrevista inventada",
+      "display_title": "Entrevista inventada",
+      "channel": "Invented Channel",
+      "duration": 1800,
+      "published_at": "2026-11-05",
+      "type": "interview",
+      "guests": [
+        "Pablo"
+      ],
+      "swap": false,
+      "flags": 5,
+      "langs": [
+        "es"
+      ],
+      "counts": {
+        "falso": 3,
+        "enganoso": 1,
+        "retorica": 1,
+        "evasiva": 0,
+        "puntualizacion": 0,
+        "contexto": 0
+      }
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import replace
 from pathlib import Path
 
-from fact_checker import analyses, feedback, install, server
+from fact_checker import analyses, feedback, install, prompts, server
 from fact_checker.adapters.diarization import Diarizer
 from fact_checker.adapters.factcheck_google import GoogleFactCheck
 from fact_checker.adapters.whisper import Whisper
@@ -141,7 +141,7 @@ def run_judge(video_id: str, home: Path, against_marks: bool) -> bool:
     return len(ruled_out) >= 6 and len(touched) <= 1
 
 
-def run_compare(video_ids: list[str], series: str | None, home: Path) -> bool:
+def run_compare(video_ids: list[str], series: str | None, home: Path, swap: bool = False) -> bool:
     """Writes the comparison of the guests of up to three analysed interviews to compare.png and compare.txt in the
     current folder, and prints both paths. Else prints in one line why not, and returns False."""
     store, interviews = Store(home), []
@@ -158,7 +158,7 @@ def run_compare(video_ids: list[str], series: str | None, home: Path) -> bool:
         print(f"More than three guests: {', '.join(p['name'] for p in c['people'])}", file=sys.stderr)
         return False
     page = summary.compare_page(c, COMPARE_TEMPLATE.read_text(),
-                                {p["video_id"]: server.thumbnail(p["video_id"], home) for p in c["people"]})
+                                {p["video_id"]: server.thumbnail(p["video_id"], home) for p in c["people"]}, swap)
     png, txt = Path("compare.png").resolve(), Path("compare.txt").resolve()
     png.write_bytes(server.screenshot(page))
     txt.write_text(summary.compare_alt(c))
@@ -190,9 +190,11 @@ def main() -> None:
         else:
             command.add_argument("--provider", choices=["claude", "codex"],
                                  help="the subscription to read with: the agent that installs names itself")
-    comparing = sub.add_parser("compare", help="one card that sets the guests of two or three interviews side by side")
+    comparing = sub.add_parser("compare", help="one card that sets side by side the guests of one debate or of up to three interviews")
     comparing.add_argument("video_ids", nargs="+", metavar="video_id")
     comparing.add_argument("--series", help="the header line; default: the programmes and the months")
+    comparing.add_argument("--swap", action="store_true",
+                           help="debate: the first column shows the right half of the thumbnail")
     reader = sub.add_parser("provider", help="print the provider in use, or switch to another and restart the helper")
     reader.add_argument("name", nargs="?", choices=["claude", "codex"])
     key = sub.add_parser("key", help="store a key in ~/.fact-checker/.env")
@@ -203,11 +205,19 @@ def main() -> None:
                         help="pull: download the new rows from the collector; send: send your pending marks now, "
                              "or write them to a dated file to mail")
     review = sub.add_parser("shared", help="the author's review of the shared analyses that wait")
-    review.add_argument("action", choices=["list", "approve", "reject"],
-                        help="list: the pending uploads; approve: serve one to everyone; reject: delete it")
+    review.add_argument("action", choices=["list", "approve", "reject", "upload"],
+                        help="list: the pending uploads; approve: serve one to everyone; reject: delete it; "
+                             "upload: share a whole local analysis again, with its summary and prompts")
     review.add_argument("video_id", nargs="?")
     review.add_argument("lang", nargs="?", choices=["es", "en"])
+    review.add_argument("--install", default="", help="approve: the start of the install id of the upload to serve, "
+                        "when the video has more than one")
+    sub.add_parser("prompts", help="print the prompts of this helper version as JSON, with an id per reading and rule")
     args = parser.parse_args()
+
+    if args.command == "prompts":
+        print(json.dumps(prompts.export(), ensure_ascii=False, indent=2))
+        return
 
     if args.command == "key":
         raise SystemExit(install.set_key(default_home(), args.name))
@@ -215,9 +225,9 @@ def main() -> None:
         raise SystemExit(install.setup(args.port, args.provider) if args.command == "setup"
                          else install.doctor(args.port, args.json))
     if args.command == "compare":
-        if not 2 <= len(args.video_ids) <= 3:
-            parser.error("compare takes two or three video ids")
-        raise SystemExit(0 if run_compare(args.video_ids, args.series, default_home()) else 1)
+        if not 1 <= len(args.video_ids) <= 3:
+            parser.error("compare takes one to three video ids")
+        raise SystemExit(0 if run_compare(args.video_ids, args.series, default_home(), args.swap) else 1)
     if args.command == "provider":
         raise SystemExit(install.set_provider(default_home(), args.name))
 
@@ -225,8 +235,11 @@ def main() -> None:
         if args.action != "list" and not args.lang:
             parser.error(f"shared {args.action} needs a video id and a language (es or en)")
         home = default_home()
+        if args.action == "upload":
+            raise SystemExit(analyses.share_again(home, server.config(home).get("feedback_url"), args.video_id,
+                                                  args.lang))
         raise SystemExit(analyses.review(home, server.config(home).get("feedback_url"), args.action, args.video_id,
-                                         args.lang))
+                                         args.lang, args.install))
     if args.command == "feedback":
         home = default_home()
         if args.action == "send":

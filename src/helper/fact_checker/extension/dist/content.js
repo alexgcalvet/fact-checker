@@ -107,9 +107,11 @@
   var severity = (f) => verdict(f) === "nitpick" ? void 0 : f.judge?.severity;
   var title = (f, lang2 = "es") => verdict(f) === "nitpick" ? NITPICK_NAME[lang2] : (LABELS[lang2][f.label] ?? f.label) + (severity(f) === "serious" ? ` \xB7 ${SERIOUS_NAME[lang2]}` : "");
 
+  // ../shared/feedback.ts
+  var PRIVACY = "https://github.com/alexgcalvet/fact-checker/blob/main/PRIVACY.md";
+
   // src/texts.ts
   var AGENT_GUIDE = "https://github.com/alexgcalvet/fact-checker/blob/main/INSTALL-AGENT.md";
-  var PRIVACY = "https://github.com/alexgcalvet/fact-checker/blob/main/PRIVACY.md";
   var stopKind = (reason) => {
     const r = reason ?? "";
     if (r === "budget") return "budget";
@@ -767,10 +769,10 @@
       cards.style.left = side === "left" ? "12px" : "";
       cards.style.right = side === "right" ? "12px" : "";
       const now = video.currentTime;
-      const flags2 = getFlags()?.flags ?? [];
+      const flags = getFlags()?.flags ?? [];
       const due = (f) => shows(f) && f.t <= now && now < f.t + seconds(f);
-      for (const id of closed) if (!flags2.some((f) => f.id === id && due(f))) closed.delete(id);
-      const visible = flags2.filter((f) => pinned.has(f.id) || held.has(f.id) || now < (lingerUntil.get(f.id) ?? 0) || due(f) && !closed.has(f.id)).sort((a, b) => a.t - b.t);
+      for (const id of closed) if (!flags.some((f) => f.id === id && due(f))) closed.delete(id);
+      const visible = flags.filter((f) => pinned.has(f.id) || held.has(f.id) || now < (lingerUntil.get(f.id) ?? 0) || due(f) && !closed.has(f.id)).sort((a, b) => a.t - b.t);
       const key = (fs) => lang() + fs.map((f) => `${f.id}${pinned.has(f.id) ? "*" : ""}`).join("|");
       const facts = visible.filter((f) => f.type !== "context");
       const chips = visible.filter((f) => f.type === "context");
@@ -805,6 +807,7 @@
     } catch {
     }
     layer.addEventListener("fc-settings", draw);
+    layer.addEventListener("fc-flags", draw);
     video.addEventListener("timeupdate", render);
     video.addEventListener("seeked", render);
     draw();
@@ -824,6 +827,10 @@
       }
     };
   }
+
+  // ../shared/panel.ts
+  var inOrder = (flags) => [...flags].sort((a, b) => a.t - b.t);
+  var litAt = (flags, now) => flags.filter((f) => f.t <= now).pop();
 
   // src/panel.ts
   var HEADS_UP = 2;
@@ -936,16 +943,16 @@
     };
     const render = () => {
       const file = getFlags();
-      const flags2 = (file?.flags ?? []).filter((f) => SHOWN_TYPES.includes(f.type)).sort((a, b) => a.t - b.t);
+      const flags = inOrder((file?.flags ?? []).filter((f) => SHOWN_TYPES.includes(f.type)));
       const analysed = file?.status === "done" ? 100 : Math.min(100, (file?.analysed_until ?? 0) / video.duration * 100);
       const preparing = file?.status === "running" && file.first_flags_s === void 0;
       const stop = file?.status === "stopped" ? file.stop_reason : void 0;
       const people = Object.entries(file?.people ?? {});
-      const key = `${lang()}|${video.duration}|${analysed}|${only}|${preparing}|${stop}|${flags2.map((f) => f.id).join("|")}|` + people.map(([name, p]) => `${name}:${p.role}`).join("|");
+      const key = `${lang()}|${video.duration}|${analysed}|${only}|${preparing}|${stop}|${flags.map((f) => f.id).join("|")}|` + people.map(([name, p]) => `${name}:${p.role}`).join("|");
       if (key === drawn) return;
       drawn = key;
       const w = words();
-      const standing = flags2.filter((f) => verdict(f) !== "drop");
+      const standing = flags.filter((f) => verdict(f) !== "drop");
       if (preparing) tab.replaceChildren(w.preparing);
       else tab.replaceChildren(`${w.panel} `, span("fc-n", `(${standing.length})`));
       if (stop === void 0) stopped.remove();
@@ -953,7 +960,7 @@
         stopped.textContent = w.stoppedLine(w.stopped[stopKind(stop)]);
         layer.append(stopped);
       }
-      marks2 = video.duration > 0 ? flags2.map((f) => {
+      marks2 = video.duration > 0 ? flags.map((f) => {
         const mark = div("fc-mark");
         mark.addEventListener("pointerenter", () => {
           tip.replaceChildren(dot(look(f)), span("fc-m fc-num", minute(f.t)), title(f, lang()));
@@ -1020,7 +1027,7 @@
         }
         top.append(list2);
       }
-      rows = flags2.filter((f) => !only || look(f).family === only).map((f) => {
+      rows = flags.filter((f) => !only || look(f).family === only).map((f) => {
         const l = look(f);
         const row = div("fc-row");
         if (seen.size && !seen.has(f.id)) row.classList.add("fc-enter");
@@ -1054,7 +1061,7 @@
         });
         return [f, row];
       });
-      seen = new Set(flags2.map((f) => f.id));
+      seen = new Set(flags.map((f) => f.id));
       lit = void 0;
       litParts = [];
       live.replaceChildren(icon("down"), w.live);
@@ -1092,7 +1099,7 @@
         mark.style.filter = soon ? "brightness(1.6)" : "";
         mark.style.boxShadow = soon ? `0 0 0 1.5px rgba(10,14,21,.7),0 0 8px 2px ${look(f).mark}` : "";
       }
-      const at = rows.filter(([f]) => f.t <= now && verdict(f) !== "drop").pop()?.[0];
+      const at = litAt(rows.map(([f]) => f).filter((f) => verdict(f) !== "drop"), now);
       for (const [f, row] of rows) {
         row.classList.toggle("fc-now", f === at);
         row.classList.toggle("fc-past", !!at && f.t < at.t);
@@ -1133,6 +1140,7 @@
       shown(shared);
       update();
     });
+    layer.addEventListener("fc-flags", update);
     for (const type of ["timeupdate", "durationchange"]) video.addEventListener(type, update);
     return () => {
       for (const type of ["timeupdate", "durationchange"]) video.removeEventListener(type, update);
@@ -1141,15 +1149,12 @@
 
   // src/content.ts
   var POLL_MS = 3e3;
-  var flags = null;
   var unmount = null;
-  var poll;
   async function send(message) {
     try {
       return await chrome.runtime.sendMessage(message);
     } catch (error) {
       if (chrome.runtime?.id && !String(error).includes("context invalidated")) throw error;
-      clearInterval(poll);
       unmount?.();
       unmount = null;
       document.removeEventListener("yt-navigate-finish", start);
@@ -1158,12 +1163,14 @@
   }
   async function start() {
     unmount?.();
-    clearInterval(poll);
-    flags = null;
+    unmount = null;
     const videoId = new URLSearchParams(location.search).get("v");
     const player = document.getElementById("movie_player");
     const video = player?.querySelector("video");
     if (location.pathname !== "/watch" || !videoId || !player || !video) return;
+    let flags = null;
+    let poll;
+    let alive = true;
     let asking = null;
     const ask = async () => {
       const res = await send({ kind: "share", videoId });
@@ -1210,6 +1217,8 @@
       () => send({ kind: "keys", videoId, lang: lang() })
     );
     unmount = () => {
+      alive = false;
+      clearInterval(poll);
       unmountPanel();
       overlay.unmount();
     };
@@ -1226,12 +1235,17 @@
     };
     const refresh = async () => {
       const res = await send({ kind: "flags", videoId, at: video.currentTime, lang: lang() });
+      if (!alive) return null;
       down(res);
-      if (res?.ok && res.data) flags = res.data;
+      if (res?.ok && res.data) {
+        flags = res.data;
+        overlay.layer.dispatchEvent(new Event("fc-flags"));
+      }
       if (flags && flags.status !== "running") clearInterval(poll);
       return res;
     };
     const follow = () => {
+      clearInterval(poll);
       poll = setInterval(refresh, POLL_MS);
       refresh();
     };
@@ -1257,14 +1271,15 @@
       if (provider) spent();
     });
     const look2 = async () => {
-      if (down(await refresh())) return;
+      const res = await refresh();
+      if (!alive || down(res)) return;
       clearInterval(poll);
       const known = flags;
       const retry = known?.status === "stopped" && Boolean(known.stop_reason?.startsWith("error"));
       if (!known || retry) {
         overlay.layer.append(button2);
-        const res = await send({ kind: "provider", videoId });
-        provider = res?.ok && res.data ? res.data.provider : "";
+        const res2 = await send({ kind: "provider", videoId });
+        provider = res2?.ok && res2.data ? res2.data.provider : "";
         if (provider && button2.isConnected) {
           spent();
           overlay.layer.append(spend);
@@ -1276,7 +1291,9 @@
       button2.remove();
       spend.remove();
       await consent();
-      if (down(await send({ kind: "analyze", videoId, from: video.currentTime, lang: lang() }))) {
+      const res = await send({ kind: "analyze", videoId, from: video.currentTime, lang: lang() });
+      if (!alive) return;
+      if (down(res)) {
         poll = setInterval(look2, POLL_MS);
         return;
       }

@@ -71,3 +71,73 @@ INSERT OR IGNORE INTO pending (video_id, lang, install_id, analysis, model, rank
   WHERE NOT EXISTS (SELECT 1 FROM migrations WHERE name = 's30-review');
 DELETE FROM analyses WHERE NOT EXISTS (SELECT 1 FROM migrations WHERE name = 's30-review');
 INSERT OR IGNORE INTO migrations (name) VALUES ('s30-review');
+
+-- S7: the prompts file of each helper version, as JSON text, written once by the first upload that carries it. Its
+-- version ends in the hash of its components, which the Worker checks, so no later upload can change it.
+CREATE TABLE IF NOT EXISTS prompts (
+  version TEXT PRIMARY KEY,
+  prompts TEXT NOT NULL,
+  received_at TEXT NOT NULL
+);
+
+-- S8: feedback on the method from the web app, one row per item: kind `flag` (a flag marked unfair and its rule) or
+-- `prompt` (a comment on a part, a rule or a quoted span of a prompts version). Only the owner reads it. The daily
+-- stops count these rows.
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,
+  video_id TEXT,
+  flag_id TEXT,
+  rule TEXT,
+  version TEXT,
+  component TEXT,
+  quote TEXT,
+  text TEXT NOT NULL,
+  install_id TEXT NOT NULL,
+  received_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS feedback_received_at ON feedback (received_at);
+CREATE INDEX IF NOT EXISTS feedback_install_id ON feedback (install_id, received_at);
+
+-- S5: the flags the owner hid, by video, language and flag id: never served and counted nowhere. One row covers the
+-- pending upload and the approved one, and outlives a re-upload. Nothing is deleted from the analysis.
+CREATE TABLE IF NOT EXISTS hidden (
+  video_id TEXT NOT NULL,
+  lang TEXT NOT NULL,
+  flag_id TEXT NOT NULL,
+  hidden_at TEXT NOT NULL,
+  PRIMARY KEY (video_id, lang, flag_id)
+);
+
+-- S7 of the web RFC: visits of a video page and jumps to a flag's moment, summed per video, language, UTC day and kind
+-- ("visit" or "seek"). No cookie, no install id: nothing tells one person from another.
+CREATE TABLE IF NOT EXISTS visits (
+  video_id TEXT NOT NULL,
+  lang TEXT NOT NULL,
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  n INTEGER NOT NULL,
+  PRIMARY KEY (video_id, lang, day, kind)
+);
+
+-- S11: the debates whose thumbnail shows the guests the other way round, one row per video for every language, set
+-- by the owner's switch on the review page. No row: the first guest of `guests` is the left half, the second the right.
+CREATE TABLE IF NOT EXISTS faces (
+  video_id TEXT PRIMARY KEY,
+  swapped_at TEXT NOT NULL
+);
+
+-- The owner's display title of a video (2026-11-22): it wins over the clean title computed from the raw one, for the
+-- cases the casing rule gets wrong. One row per video; deleting it gives the clean title back.
+CREATE TABLE IF NOT EXISTS titles (
+  video_id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  set_at TEXT NOT NULL
+);
+
+-- The videos the owner turned off (2026-11-22): the public API, the web app's share tags and the visit counter skip
+-- them, and the review page still lists them. One row per video for every language; deleting it turns the video on.
+CREATE TABLE IF NOT EXISTS inactive (
+  video_id TEXT PRIMARY KEY,
+  off_at TEXT NOT NULL
+);

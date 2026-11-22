@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0+5df934af8305",
+  "components": [
+    {
+      "id": "system",
+      "role": "every",
+      "text": "You analyse {} conversations. Answer only with the JSON that the schema asks for.",
+      "rules": []
+    },
+    {
+      "id": "parts",
+      "role": "parts",
+      "text": "You review a part of a {spoken} conversation (an invented excerpt).\n\nLabels:\n- ad_hominem: attacks the person instead of the argument.\n- insinuation: suggests a grave accusation without evidence, put as a question (\"¿es verdad que…? ¿sí o no?\", \"is it true that…?\").\n\nFor each flag:\n- reason: one short sentence in {reader}.",
+      "rules": [
+        {
+          "id": "ad_hominem",
+          "text": "- ad_hominem: attacks the person instead of the argument."
+        },
+        {
+          "id": "insinuation",
+          "text": "- insinuation: suggests a grave accusation without evidence, put as a question (\"¿es verdad que…? ¿sí o no?\", \"is it true that…?\")."
+        }
+      ]
+    },
+    {
+      "id": "verdict",
+      "role": "verdict",
+      "text": "You check claims made in a {spoken} video (an invented excerpt).\n\nFor each claim give:\n- verdict: true, false or misleading. Say false or misleading only when a source shows it.\n- reason: one short sentence in {reader}, with the correct figure.",
+      "rules": [
+        {
+          "id": "false",
+          "text": "- verdict: true, false or misleading. Say false or misleading only when a source shows it."
+        },
+        {
+          "id": "misleading",
+          "text": "- verdict: true, false or misleading. Say false or misleading only when a source shows it."
+        }
+      ]
+    },
+    {
+      "id": "judge",
+      "role": "judge",
+      "text": "You review the flags that an automatic analyst found in a {spoken} conversation (an invented excerpt): \"keep\" or \"nitpick\".",
+      "rules": []
+    }
+  ]
+}

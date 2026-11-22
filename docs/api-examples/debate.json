@@ -1,0 +1,111 @@
+{
+  "video_id": "debate01",
+  "title": "Invented debate",
+  "display_title": "Invented debate",
+  "channel": "Invented Channel",
+  "duration": 3600,
+  "published_at": "2026-11-10",
+  "type": "debate",
+  "guests": [
+    "Ana",
+    "Luis"
+  ],
+  "swap": false,
+  "flags": 12,
+  "lang": "en",
+  "prompts": "0.1.0+5df934af8305",
+  "summary": {
+    "Ana": {
+      "checked": 10,
+      "verdicts": {
+        "false": 2,
+        "misleading": 1,
+        "nitpick": 1,
+        "correct": 6
+      },
+      "severity": {
+        "serious": 2,
+        "moderate": 1,
+        "minor": 2
+      },
+      "devices": [
+        {
+          "label": "ad_hominem",
+          "count": 2
+        }
+      ],
+      "dodged": 0,
+      "partial": 0,
+      "asked": 4,
+      "gravest": [
+        "false-1.0",
+        "ad_hominem-11.0"
+      ]
+    },
+    "Luis": {
+      "checked": 8,
+      "verdicts": {
+        "false": 1,
+        "misleading": 2,
+        "nitpick": 1,
+        "correct": 4
+      },
+      "severity": {
+        "serious": 2,
+        "moderate": 1,
+        "minor": 2
+      },
+      "devices": [
+        {
+          "label": "ad_hominem",
+          "count": 2
+        }
+      ],
+      "dodged": 0,
+      "partial": 0,
+      "asked": 3,
+      "gravest": [
+        "misleading-8.0",
+        "ad_hominem-4.0"
+      ]
+    }
+  },
+  "people": {
+    "Ana": {
+      "role": "guest",
+      "spoken_s": 1720,
+      "turns": 6,
+      "longest_s": 340
+    },
+    "Luis": {
+      "role": "guest",
+      "spoken_s": 1490,
+      "turns": 5,
+      "longest_s": 300
+    },
+    "Marta": {
+      "role": "host",
+      "spoken_s": 350,
+      "turns": 5,
+      "longest_s": 100
+    }
+  },
+  "turns": [
+    { "start": 0, "end": 60, "person": "Marta" },
+    { "start": 60, "end": 400, "person": "Ana" },
+    { "start": 410, "end": 700, "person": "Luis" },
+    { "start": 700, "end": 760, "person": "Marta" },
+    { "start": 760, "end": 1000, "person": "Ana" },
+    { "start": 1000, "end": 1300, "person": "Luis" },
+    { "start": 1310, "end": 1600, "person": "Ana" },
+    { "start": 1600, "end": 1700, "person": "Marta" },
+    { "start": 1700, "end": 2000, "person": "Luis" },
+    { "start": 2000, "end": 2300, "person": "Ana" },
+    { "start": 2310, "end": 2610, "person": "Luis" },
+    { "start": 2620, "end": 2900, "person": "Ana" },
+    { "start": 2900, "end": 3000, "person": "Marta" },
+    { "start": 3000, "end": 3300, "person": "Luis" },
+    { "start": 3300, "end": 3570, "person": "Ana" },
+    { "start": 3570, "end": 3600, "person": "Marta" }
+  ]
+}

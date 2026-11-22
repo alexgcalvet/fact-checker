@@ -7,3 +7,39 @@ compatibility_date = "2026-11-01"
 binding = "DB"
 database_name = "fact-checker-feedback"
 database_id = "fb67f631-7d4c-4bc3-be16-2f1f4ac7b665"
+
+# Writes per address (CF-Connecting-IP): ids cost nothing to make, so the daily stops per id need this too. The count is
+# per Cloudflare location and approximate.
+[[ratelimits]]
+name = "WRITES"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+# The review page (web/admin/) and the web app (web/app/). The Worker runs first on /admin*, /api/* and /try/*, so the
+# Access check guards the review page and its calls, a file never shadows an API route, and an old /try/ link redirects
+# to the viewer; and on /, /es/* and /en/*, so every web path gets the app's HTML
+# with its share tags (docs/research/workers-spa-and-rewriter.md).
+[assets]
+directory = "web"
+binding = "ASSETS"
+run_worker_first = ["/", "/es/*", "/en/*", "/admin*", "/api/*", "/try/*"]
+
+# Workers Caching (docs/research/workers-caching.md): only the PublicApi entrypoint, which serves /api/*, is cached.
+# The default entrypoint stays uncached: with caching on, an answer with no Cache-Control is kept for 2 hours.
+[cache]
+enabled = true
+
+[exports.default]
+type = "worker"
+
+[exports.default.cache]
+enabled = false
+
+[exports.PublicApi]
+type = "worker"
+
+[exports.PublicApi.cache]
+enabled = true

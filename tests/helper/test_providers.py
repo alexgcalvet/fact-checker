@@ -869,3 +869,40 @@ def test_hung_claude_is_cut(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="timed out"):
         ClaudeCLI(tmp_path, timeout=1).complete("hola", {"type": "object"})
     assert time.monotonic() - t0 < 10
+
+
+# Inline 2026-11-22 · A CLI reading never gets the helper's keys
+#
+# Story: The person keeps ANTHROPIC_API_KEY and HF_TOKEN in the helper's `.env`, and the helper puts them in its
+# environment. A `claude -p` reading with that key in its environment would bill the API in place of the
+# subscription, and a reading led by a prompt injection could print it. Each `claude` and `codex` reading starts
+# without the keys of `.env`; the rest of the environment (PATH, the cache setting) stays.
+#
+# Setup: a temporary helper home whose `.env` holds two invented keys, also set in the environment as `serve` does;
+# fake `claude` and `codex` commands that write their environment to a file and answer `{}`.
+
+def test_cli_readings_get_no_keys(tmp_path, monkeypatch):
+    keys = {"ANTHROPIC_API_KEY": "sk-invented-1", "HF_TOKEN": "hf-invented-2"}
+    (tmp_path / ".env").write_text("".join(f"{k}={v}\n" for k, v in keys.items()))
+    for k, v in keys.items():
+        monkeypatch.setenv(k, v)
+    seen = tmp_path / "env"
+    ok = json.dumps({"is_error": False, "total_cost_usd": 0.01, "usage": USAGE, "structured_output": {}})
+    events = "\n".join(json.dumps(e) for e in (
+        {"type": "thread.started", "thread_id": "t"},
+        {"type": "item.completed", "item": {"type": "agent_message", "text": "{}"}},
+        {"type": "turn.completed", "usage": {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}}))
+    for name, answer in (("claude", ok), ("codex", events)):
+        (tmp_path / name).write_text(f"#!/bin/sh\ncat > /dev/null\nenv > {seen}.{name}\ncat <<'EOF'\n{answer}\nEOF\n")
+        (tmp_path / name).chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.delenv("CODEX_BIN", raising=False)
+
+    for provider in ("claude", "codex"):
+        (tmp_path / "config.toml").write_text(f'provider = "{provider}"\n')
+        server.provider_llm(tmp_path, "parts").complete("hola", {"type": "object"})
+        env = (tmp_path / f"env.{provider}").read_text()
+        for value in keys.values():
+            assert value not in env, f"FAIL · the {provider} reading got a key of .env"
+        assert f"PATH={tmp_path}" in env, f"FAIL · the {provider} reading lost PATH"
+    assert "FORCE_PROMPT_CACHING_5M=1" in (tmp_path / "env.claude").read_text()

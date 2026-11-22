@@ -792,3 +792,93 @@ def test_key_page_origin(tmp_path, monkeypatch):
         httpd.shutdown()
         httpd.server_close()
     print("PASS S40 A4 · The key page refuses other sites")
+
+
+# Inline 2026-11-22 · Only the extension and local programs reach the helper
+#
+# Story: The person visits a web page while the helper runs. The page posts to the helper: it turns sharing on,
+# starts an analysis, writes a mark. It also reads the flag file through a host name that points at 127.0.0.1
+# (DNS rebinding). The helper refuses each one. The extension (Origin chrome-extension://…) and a local program
+# (no Origin) still work.
+#
+# Setup: a temporary helper home with one analysed video; requests sent by hand with the Host and Origin headers
+# that a browser would send.
+
+def test_other_sites_refused(tmp_path):
+    store = Store(tmp_path)
+    store.save({"video_id": VIDEO, "published_at": "2026-11-10", "status": "done", "stop_reason": None,
+                "flags": [FLAG]})
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler(Helper(tmp_path)))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    port = httpd.server_address[1]
+    own = f"127.0.0.1:{port}"
+
+    def send(method: str, path: str, host: str = own, origin: str | None = None, body: bytes | None = None,
+             length: str | None = None) -> int:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        headers = {"Host": host, "Content-Type": "text/plain"} | ({"Origin": origin} if origin else {}) | \
+            ({"Content-Length": length} if length else {})
+        conn.request(method, path, body=body, headers=headers)
+        status = conn.getresponse().status
+        conn.close()
+        return status
+
+    share = b'{"share": true}'
+    mark = json.dumps({"flag_id": FLAG["id"], "verdict": "unfair", "reason": ""}).encode()
+    try:
+        # Case 1 · another site posts (a simple request, no preflight) → 403, nothing changes
+        for path, body in (("/share", share), (f"/videos/{VIDEO}/marks", mark), (f"/videos/{VIDEO}?from=0", b"")):
+            assert send("POST", path, origin="https://evil.example", body=body) == 403, f"FAIL · POST {path} from another site"
+        assert request(port, "/share") == {"share": None}, "FAIL · another site turned sharing on"
+        assert store.marks(VIDEO) == {}, "FAIL · another site wrote a mark"
+
+        # Case 2 · a read through another host name (DNS rebinding) → 403
+        for path in (f"/videos/{VIDEO}", "/health", "/share"):
+            assert send("GET", path, host=f"evil.example:{port}") == 403, f"FAIL · GET {path} through another host"
+
+        # Case 3 · a body over 10 kB, or a negative length → 400, the thread is not held
+        assert send("POST", f"/videos/{VIDEO}/marks", body=b"x" * 20_000) == 400, "FAIL · a huge body was read"
+        assert send("POST", "/share", body=b"", length="-1") == 400, "FAIL · a negative length was accepted"
+
+        # Case 4 · the extension and a local program still reach the helper
+        assert send("GET", f"/videos/{VIDEO}", origin="chrome-extension://abcdefghijklmnop") == 200
+        assert send("POST", "/share", origin="chrome-extension://abcdefghijklmnop", body=share) == 200
+        assert send("POST", f"/videos/{VIDEO}/marks", body=mark) == 200
+    finally:
+        httpd.shutdown()
+
+
+# Inline 2026-11-22 · Two writers of one flag file never break each other
+#
+# Story: An analysis saves its flag file while the person sets a speaker's role from the panel. The run and the server
+# each hold their own Store of the same helper home. Each save completes, and the file is always whole JSON. A mark
+# read while marks are written is never half a line.
+#
+# Setup: a temporary helper home; two Store objects of it; two threads that save the same flag file 200 times each,
+# and two threads that append and read marks.
+
+def test_two_writers_one_file(tmp_path):
+    run_store, server_store = Store(tmp_path), Store(tmp_path)
+    run_store.save({"video_id": VIDEO, "flags": []})
+    errors = []
+
+    def keep(fn):
+        def loop():
+            for i in range(200):
+                try:
+                    fn(i)
+                except Exception as e:
+                    errors.append(repr(e))
+        return threading.Thread(target=loop)
+
+    big = [FLAG] * 50
+    threads = [keep(lambda i: run_store.save({"video_id": VIDEO, "flags": big, "i": i})),
+               keep(lambda i: server_store.save({"video_id": VIDEO, "flags": [FLAG], "i": i})),
+               keep(lambda i: run_store.add_mark(VIDEO, FLAG | {"quote": "x" * 5000}, "unfair", "")),
+               keep(lambda i: server_store.marks(VIDEO))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == [], f"FAIL · {len(errors)} writes or reads broke: {errors[:2]}"
+    assert json.loads((tmp_path / "videos" / f"{VIDEO}.json").read_text())["video_id"] == VIDEO

@@ -17,6 +17,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: cd src/collector && npm ci
+      - run: cd src/web && npm ci
       - run: cd src/extension && npm ci && npx tsc --noEmit && npx tsc -p ../collector --noEmit && npx vitest run && npm run build
       - name: The shipped extension matches a fresh build
         run: git diff --exit-code -- src/helper/fact_checker/extension
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd src/web && npm ci && npx tsc --noEmit && npm run build
+      - name: The served web app matches a fresh build
+        run: git diff --exit-code -- src/collector/web/app && test -z "$(git status --porcelain -- src/collector/web/app)"
+      - name: The brand files are there, and the web app names no hex colour
+        run: bash tests/web/check-brand.sh && ! grep -rnE '#[0-9a-fA-F]{3,8}\b' src/web/src

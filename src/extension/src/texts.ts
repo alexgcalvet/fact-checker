@@ -2,7 +2,7 @@
 import { LABELS, NITPICK_NAME, SERIOUS_NAME } from "./flags";
 
 export const AGENT_GUIDE = "https://github.com/alexgcalvet/fact-checker/blob/main/INSTALL-AGENT.md";
-export const PRIVACY = "https://github.com/alexgcalvet/fact-checker/blob/main/PRIVACY.md";
+export { PRIVACY } from "../../shared/feedback";
 
 /** The kind of the helper's stop reason, which picks its line in `stopped`; the raw reason stays in the flag file. */
 export type StopKind = "captions" | "speech" | "budget" | "provider" | "other";

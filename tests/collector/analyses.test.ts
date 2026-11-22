@@ -4,12 +4,14 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import worker from "../../src/collector/src/index";
 import { fakeD1 } from "../support/d1_fake";
+import { fakeLimit } from "../support/limit_fake";
 
 // S28 A3 · The collector keeps the first whole analysis and guards it
 //
 // Story: The collector stores the owner's first upload of a video in Spanish (201) and serves it to anyone (S30:
-// a stranger's upload waits for review, see tests/collector/analyses.test.ts (S30 A1)). A later upload read
-// by Sonnet is refused (409) and the Opus one stays; an Opus upload over a Sonnet one replaces it (200). An unfinished
+// a stranger's upload waits for review, see tests/collector/analyses.test.ts (S30 A1)). A stranger's later upload
+// read by Sonnet is refused (409) and the Opus one stays; their Opus upload over a Sonnet one waits for review (202).
+// S4: the owner's own upload replaces any (tests/collector/owner-replaces.test.ts). An unfinished
 // analysis, a source link that is not http(s), an unknown field (400), a body over 1 MB or with over 1,000 flags
 // (413), and the 11th accepted upload of one tester in a UTC day (429) store nothing. The owner deletes the row with
 // the admin token (200); a delete without it gets 401.
@@ -37,10 +39,12 @@ import { fakeD1 } from "../support/d1_fake";
 
   function collector() {
     const DB = fakeD1();
-    const env = { DB, ADMIN_TOKEN: "admin-secret" } as any;
+    const env = { DB, WRITES: fakeLimit(), ADMIN_TOKEN: "admin-secret" } as any;
+    // The owner's upload (TESTER, the admin token) is served at once; anyone else's (OTHER) goes through the rank rule.
     const put = (body: unknown, video = "abcdefgh", lang = "es", installId = TESTER) =>
       worker.fetch(new Request(`${BASE}/${video}?lang=${lang}`, {
-        method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer admin-secret" },
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...(installId === OTHER ? {} : { Authorization: "Bearer admin-secret" }) },
         body: typeof body === "string" ? body : JSON.stringify({ install_id: installId, analysis: body }),
       }), env);
     const get = (video = "abcdefgh", lang = "es") => worker.fetch(new Request(`${BASE}/${video}?lang=${lang}`), env);
@@ -73,13 +77,13 @@ import { fakeD1 } from "../support/d1_fake";
       expect(((await (await get()).json()) as any).cost_usd).toBe(7.9);
     });
 
-    // Case 3 · an Opus upload over a Sonnet one → 200, replaced; an unknown model ranks under Sonnet
-    it("Case 3 · Opus after Sonnet → 200 and replaced; an unknown model after Sonnet → 409", async () => {
+    // Case 3 · a stranger's Opus upload over a Sonnet one → 202, pending; an unknown model ranks under Sonnet
+    it("Case 3 · Opus after Sonnet → 202 pending; an unknown model after Sonnet → 409", async () => {
       const { put, get, count } = collector();
       await put(analysis("abcdefgh", "sonnet"));
       expect((await put(analysis("abcdefgh", "some-local-model"), "abcdefgh", "es", OTHER)).status).toBe(409);
-      expect((await put(analysis("abcdefgh", "claude-opus-5-5"), "abcdefgh", "es", OTHER)).status).toBe(200);
-      expect(((await (await get()).json()) as any).readers.parts.model).toBe("claude-opus-5-5");
+      expect((await put(analysis("abcdefgh", "claude-opus-5-5"), "abcdefgh", "es", OTHER)).status).toBe(202);
+      expect(((await (await get()).json()) as any).readers.parts.model).toBe("sonnet");
       expect(count()).toBe(1);
     });
 
@@ -117,7 +121,7 @@ import { fakeD1 } from "../support/d1_fake";
       for (let i = 0; i < 10; i++) expect((await put(analysis(`video${i}xx`), `video${i}xx`)).status).toBe(201);
       expect((await put(analysis("video10xx"), "video10xx")).status).toBe(429);
       expect(count()).toBe(10);
-      expect((await put(analysis("video10xx"), "video10xx", "es", OTHER)).status).toBe(201);
+      expect((await put(analysis("video10xx"), "video10xx", "es", OTHER)).status).toBe(202);
     });
 
     // Case 7 · the owner deletes a row → 200 with the token, 401 without it or with a wrong one
@@ -165,7 +169,7 @@ import { fakeD1 } from "../support/d1_fake";
   });
 
   function collector() {
-    const env = { DB: fakeD1(), ADMIN_TOKEN: TOKEN } as any;
+    const env = { DB: fakeD1(), WRITES: fakeLimit(), ADMIN_TOKEN: TOKEN } as any;
     const auth = (token?: string): Record<string, string> => (token ? { Authorization: `Bearer ${token}` } : {});
     const put = (body: object, { video = "abcdefgh", installId = STRANGER, token = "" } = {}) =>
       worker.fetch(new Request(`${BASE}/${video}?lang=es`, {
@@ -174,8 +178,13 @@ import { fakeD1 } from "../support/d1_fake";
       }), env);
     const get = (video = "abcdefgh") => worker.fetch(new Request(`${BASE}/${video}?lang=es`), env);
     const list = (token?: string) => worker.fetch(new Request(BASE, { headers: auth(token) }), env);
-    const review = (action: "approve" | "reject", video = "abcdefgh", token = TOKEN) =>
-      worker.fetch(new Request(`${BASE}/${video}/${action}?lang=es`, { method: "POST", headers: auth(token) }), env);
+    // A review names one upload, as the owner's list shows it.
+    const review = async (action: "approve" | "reject", video = "abcdefgh", token = TOKEN) => {
+      const { rows } = (await (await list(TOKEN)).json()) as any;
+      const row = rows.find((r: any) => r.video_id === video) ?? {};
+      const which = new URLSearchParams({ lang: "es", install: row.install_id ?? "", at: row.received_at ?? "" });
+      return worker.fetch(new Request(`${BASE}/${video}/${action}?${which}`, { method: "POST", headers: auth(token) }), env);
+    };
     return { put, get, list, review };
   }
 
@@ -215,7 +224,7 @@ import { fakeD1 } from "../support/d1_fake";
       expect(((await (await list(TOKEN)).json()) as any).rows).toEqual([]);
     });
 
-    // Case 4 · reject → deleted, never served; a second review of it → 404
+    // Case 4 · reject → deleted, never served; approving it after → 409
     it("Case 4 · reject → 200; GET still 404; nothing left to approve", async () => {
       const { put, get, list, review } = collector();
       await put(analysis("otherone"), { video: "otherone" });
@@ -223,7 +232,7 @@ import { fakeD1 } from "../support/d1_fake";
       expect((await review("reject", "otherone")).status).toBe(200);
       expect((await get("otherone")).status).toBe(404);
       expect(((await (await list(TOKEN)).json()) as any).rows).toEqual([]);
-      expect((await review("approve", "otherone")).status).toBe(404);
+      expect((await review("approve", "otherone")).status).toBe(409);
     });
 
     // Case 5 · the owner's own upload → served at once, never pending
@@ -288,7 +297,7 @@ import { fakeD1 } from "../support/d1_fake";
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ install_id: "11111111-1111-4111-8111-111111111111",
                                analysis: { ...analysis, helper_version: "0.1.0" } }),
-      }), { DB: fakeD1(), ADMIN_TOKEN: "admin-secret" } as any);
+      }), { DB: fakeD1(), WRITES: fakeLimit(), ADMIN_TOKEN: "admin-secret" } as any);
       expect(await res.json()).toEqual({ pending: true });
     });
   });

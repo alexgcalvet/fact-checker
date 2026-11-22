@@ -30,6 +30,7 @@ Name each voice: the person's name if the conversation says it, followed by the 
 as {named} or {role}. Use a role alone when no name is said. Two voices never get
 the same name.
 Give each voice its role: "host" for whoever leads the conversation and asks the questions, "guest" for everyone else.
+In a debate, only a moderator is "host"; every debater is "guest", even one who asks the other questions.
 Give each voice its person: the full name of that person, from the conversation, else from the video title; the
 voice's name when neither says it.
 
@@ -111,3 +112,33 @@ def voice_at(transcript: Transcript, t: float) -> str | None:
         return None
     voice = transcript.segments[max(0, bisect.bisect_right([s.t for s in transcript.segments], t) - 1)].speaker
     return voice and transcript.speakers.get(voice, voice)
+
+
+def merged(turns: list[dict], names: dict[str, str]) -> list[dict]:
+    """The voice turns by person, in order: {start, end, person}, to the tenth of a second. Consecutive turns of one
+    voice merge into one, since the diarizer splits a voice at short pauses. A voice with no name is left out."""
+    out: list[dict] = []
+    for turn in sorted(turns, key=lambda t: t["start"]):
+        person = names.get(turn["speaker"])
+        if not person:
+            continue
+        if out and out[-1]["person"] == person:
+            out[-1]["end"] = max(out[-1]["end"], round(turn["end"], 1))
+        else:
+            out.append({"start": round(turn["start"], 1), "end": round(turn["end"], 1), "person": person})
+    return out
+
+
+def speech(turns: list[dict], names: dict[str, str]) -> dict[str, dict]:
+    """Person → {spoken_s, turns, longest_s}: the seconds of speech summed over the voice turns, the number of merged
+    turns and the longest merged turn, in whole seconds."""
+    spoken: dict[str, float] = {}
+    for turn in turns:
+        if person := names.get(turn["speaker"]):
+            spoken[person] = spoken.get(person, 0) + turn["end"] - turn["start"]
+    out = {p: {"spoken_s": round(s), "turns": 0, "longest_s": 0} for p, s in spoken.items()}
+    for turn in merged(turns, names):
+        p = out[turn["person"]]
+        p["turns"] += 1
+        p["longest_s"] = max(p["longest_s"], round(turn["end"] - turn["start"]))
+    return out

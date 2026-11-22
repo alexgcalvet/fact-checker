@@ -10,9 +10,13 @@ The collector is a Cloudflare Worker with a D1 database, run by the author.
 |---|---|
 | You mark a card | The video id, the flag id, its second, type and label, the quote, the confidence, your verdict (correct or unfair) and your reason, the provider and model that made the flag, the helper version, a random install id and the time it arrived |
 | You finish a whole analysis | The flags with their sources and the judge's verdicts, the video id, title, channel, date and length, the speaker names, the languages, the provider and model of each step, the cost, the helper version, a random install id and the time it arrived |
-| Each day you send | A count of your requests per install id, for the daily limit |
+| You mark a card on the test page (`/try/`) | The same fields as a mark, with helper version `web`, no provider or model, and a random id of your browser in place of the install id |
+| You comment on the method on the test page, or mark a card unfair there | The kind (`prompt` or `flag`), the video id, the flag id or the part of the method, its rule, the words you selected, the prompts version, your comment or reason, the random id of your browser and the time it arrived. Only the author reads it |
+| Each day you send | A count of your requests per install id, for the daily limit, and one count of all test page marks |
 
 The install id is a random number made once on your machine (`~/.fact-checker/install-id`). It groups the marks of one tester; it does not say who you are.
+
+The test page asks once before it sends anything. It keeps your answer and its random id in your browser's storage (`fc-share`, `fc-web-id`); clear the site data to forget both. Answer **No** and no mark or comment leaves the page.
 
 An analysis you upload waits for the author's review. Once approved, anyone who opens that video gets its flags, without your install id.
 

@@ -1,0 +1,98 @@
+{
+  "Ana": {
+    "checked": 10,
+    "asked": 4,
+    "flags": {
+      "false-5.0": {
+        "verdict": "false",
+        "severity": "moderate",
+        "device": null,
+        "question": null
+      },
+      "ad_hominem-11.0": {
+        "verdict": null,
+        "severity": "serious",
+        "device": "ad_hominem",
+        "question": null
+      },
+      "false-1.0": {
+        "verdict": "false",
+        "severity": "serious",
+        "device": null,
+        "question": null
+      },
+      "false-9.0": {
+        "verdict": "nitpick",
+        "severity": null,
+        "device": null,
+        "question": null
+      },
+      "misleading-3.0": {
+        "verdict": "misleading",
+        "severity": "minor",
+        "device": null,
+        "question": null
+      },
+      "ad_hominem-7.0": {
+        "verdict": null,
+        "severity": "minor",
+        "device": "ad_hominem",
+        "question": null
+      }
+    },
+    "gravest": [
+      "false-1.0",
+      "ad_hominem-11.0",
+      "false-5.0",
+      "misleading-3.0"
+    ]
+  },
+  "Luis": {
+    "checked": 8,
+    "asked": 3,
+    "flags": {
+      "false-2.0": {
+        "verdict": "false",
+        "severity": "moderate",
+        "device": null,
+        "question": null
+      },
+      "misleading-8.0": {
+        "verdict": "misleading",
+        "severity": "serious",
+        "device": null,
+        "question": null
+      },
+      "ad_hominem-4.0": {
+        "verdict": null,
+        "severity": "serious",
+        "device": "ad_hominem",
+        "question": null
+      },
+      "false-6.0": {
+        "verdict": "nitpick",
+        "severity": null,
+        "device": null,
+        "question": null
+      },
+      "misleading-12.0": {
+        "verdict": "misleading",
+        "severity": "minor",
+        "device": null,
+        "question": null
+      },
+      "ad_hominem-10.0": {
+        "verdict": null,
+        "severity": "minor",
+        "device": "ad_hominem",
+        "question": null
+      }
+    },
+    "gravest": [
+      "misleading-8.0",
+      "ad_hominem-4.0",
+      "false-2.0",
+      "misleading-12.0"
+    ]
+  }
+}

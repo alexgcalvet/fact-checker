@@ -84,12 +84,12 @@ def save(home, *interviews) -> None:
                 store.add_mark(data["video_id"], f, marks[f["id"]], "", shared=False)
 
 
-def compare(home, out, monkeypatch, capsys, *args) -> tuple[int, str]:
-    """Runs `fact-checker compare <args>` in `out` with the helper home `home`, no thumbnail download and a screenshot
+def compare(home, out, monkeypatch, capsys, *args, thumbnail=None) -> tuple[int, str]:
+    """Runs `fact-checker compare <args>` in `out` with the helper home `home`, `thumbnail` for every video and a screenshot
     that returns the HTML of the card instead of a PNG. Returns the exit code and what the command printed."""
     monkeypatch.setenv("FACT_CHECKER_HOME", str(home))
     monkeypatch.chdir(out)
-    monkeypatch.setattr(server, "thumbnail", lambda video_id, home: None)
+    monkeypatch.setattr(server, "thumbnail", lambda video_id, home: thumbnail)
     monkeypatch.setattr(server, "screenshot", lambda html, *a, **k: html.encode())
     monkeypatch.setattr(sys, "argv", ["fact-checker", "compare", *args])
     try:
